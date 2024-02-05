@@ -46,14 +46,16 @@ class Netcdf4Exporter:
 
     """Handle the export of regridded landsat data to netcdf4 and PNG"""
 
-    def __init__(self, landsat_metadata):
+    def __init__(self, landsat_metadata, inject_metadata):
         """
         Construct an exporter instance
 
         Args:
             landsat_metadata: a LandsatMetadata object
+            inject_metadata: dictionary to supply additional global metadata to add to exported file
         """
         self.landsat_metadata = landsat_metadata
+        self.inject_metadata = inject_metadata
         self.logger = logging.getLogger("Netcdf4Exporter")
 
 
@@ -63,9 +65,14 @@ class Netcdf4Exporter:
 
         Args:
             input_path: the path to the input scene
+            lats: 2d array of latitudes for each pixel
+            lons: 2d array of longitudes for each pixel
+            output_layers: list of (band,array) pairs for each layer to export
             to_path: the path to which netcdf4 data is to be exported
-            include_angles:
-            history:
+            bounds: tuple of form ((min_lat,min_lon),(max_lat,max_lon))
+            include_angles: whether to include simulated SAA,SZA,VAA,VZA (applicable for collection 1)
+            history: string to supply the processing history to add to global metadata
+            shrink: whether to shrink the exported data to include the area described in the bounds parameter
         """
         dataset = xr.Dataset()
 
@@ -111,6 +118,9 @@ class Netcdf4Exporter:
 
         dataset.attrs["creator_name"] = username
         dataset.attrs["date_created"] = date_format(datetime.datetime.now().astimezone())
+
+        for (key,value) in self.inject_metadata.items():
+            dataset.attrs[key] = value
 
         ecomp = {'zlib': True, 'complevel': 5}
         encodings = {"time": {"units": "seconds since 1978-01-01"}}
@@ -165,7 +175,7 @@ class Netcdf4Exporter:
                 dataset[band_name].attrs["flag_meanings"] = ' '.join(s.replace(' ', '_') for s in flag_meanings)
 
         if include_angles and self.landsat_metadata.get_collection() == 1:
-            # for collection 2, angles should already be included via bands SAA.SZA,VAA,VZA converted from TIFFs
+            # for collection 2, angles should already be included via bands SAA,SZA,VAA,VZA converted from TIFFs
             # for collection 1, need to create equivalent but constant per-pixel angles from the metadata
             for name in ["satellite_zenith_angle","relative_azimuth_angle"]:
                 da = self.create_dummy_angles(nlat,nlon)

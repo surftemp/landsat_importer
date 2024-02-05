@@ -222,7 +222,8 @@ class Processor:
         """
         return self.landsat_metadata
 
-    def export(self, output_path, include_angles=False, history="", min_lat=None, min_lon=None, max_lat=None, max_lon=None):
+    def export(self, output_path, include_angles=False, history="",
+               min_lat=None, min_lon=None, max_lat=None, max_lon=None, inject_metadata={}):
         """
         Export the regridded scene
 
@@ -230,10 +231,15 @@ class Processor:
             output_path: the path to which the scene is written in netcdf4 format
             include_angles: include angle variables in the exported netcdf4 file
             history: a string which summarises the processing parameters
+            min_lat: clip exported data to bounding box
+            min_lon: clip exported data to bounding box
+            max_lat: clip exported data to bounding box
+            max_lon: clip exported data to bounding box
+            inject_metadata: dictionary to supply global metadata to add to exported file
         """
         self.logger.info("Exporting output grid to file %s" % output_path)
 
-        exporter = Netcdf4Exporter(self.get_landsat_metadata())
+        exporter = Netcdf4Exporter(self.get_landsat_metadata(),inject_metadata)
 
         shrink = False
         if min_lat is None:
