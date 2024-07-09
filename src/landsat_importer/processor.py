@@ -274,8 +274,6 @@ class Processor:
         else:
             shrink = True
 
-
-
         exporter.export(input_path=self.input_path, lats=self.lats, lons=self.lons, output_layers=self.output_layers,
                         bounds=((min_lat,min_lon),(max_lat,max_lon)), include_angles=include_angles,
                         history=history,to_path=output_path,shrink=shrink)

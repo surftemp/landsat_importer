@@ -37,6 +37,7 @@ slurm_defaults = {
     'name': 'landsat_importer'
 }
 
+
 def main():
 
     logging.basicConfig(level=logging.INFO)
@@ -181,6 +182,10 @@ def main():
                          max_lat=args.max_lat, max_lon=args.max_lon, inject_metadata=inject_metadata)
             except Exception as ex:
                 logger.exception(f"Processing failed for {input_path}: "+str(ex))
+                if len(input_paths) == 1:
+                    # if only processing one scene, re-raise the exception and fail the execution
+                    # if processing multiple scenes, continue
+                    raise
 
 if __name__ == '__main__':
     main()

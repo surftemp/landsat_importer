@@ -203,7 +203,10 @@ class LandsatMetadata:
             acquisition_time = self["LANDSAT_METADATA_FILE/IMAGE_ATTRIBUTES/SCENE_CENTER_TIME"][0:8]  # HH:MM:SS
             self.sensor_id = self["LANDSAT_METADATA_FILE/IMAGE_ATTRIBUTES/SENSOR_ID"]
         else:
-            raise Exception("Unable to parse metadata file %s" % path)
+            raise Exception("Unable to parse metadata file %s" % self.path)
+
+        self.product_id = self["LANDSAT_METADATA_FILE/PRODUCT_CONTENTS/LANDSAT_PRODUCT_ID"]
+        self.scene_id = self["LANDSAT_METADATA_FILE/LEVEL1_PROCESSING_RECORD/LANDSAT_SCENE_ID"]
 
         if self.processing_level.startswith("L1"):
             self.level = 1
@@ -314,6 +317,9 @@ class LandsatMetadata:
                 self.standard_names[band] = oli_standard_name
             if oli_comment:
                 self.comments[band] = oli_comment
+
+    def get_id(self):
+        return f"LANDSAT_SCENE_ID={self.scene_id} LANDSAT_PRODUCT_ID={self.product_id}"
 
     def get_path(self):
         """

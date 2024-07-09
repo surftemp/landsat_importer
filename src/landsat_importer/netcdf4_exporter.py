@@ -82,7 +82,9 @@ class Netcdf4Exporter:
         ((min_lat,min_lon),(max_lat,max_lon)) = bounds
 
         dataset.attrs['landsat_importer_version'] = LANDSAT_IMPORTER_VERSION
-        dataset.attrs['input_scene'] = os.path.split(input_path)[-1]
+        dataset.attrs['source_file'] = os.path.split(input_path)[-1]
+        dataset.attrs['source'] = self.landsat_metadata.get_id()
+
         dataset.attrs['platform'] = self.landsat_metadata.get_spacecraft_id()
 
         acquistion_dt = self.landsat_metadata.get_acquisition_timestamp()
@@ -97,8 +99,8 @@ class Netcdf4Exporter:
         dataset.attrs["geospatial_lon_min"] = min_lon
         dataset.attrs["geospatial_lat_max"] = max_lat
         dataset.attrs["geospatial_lon_max"] = max_lon
-        dataset.attrs["geospatial_lat_units"] = "degrees north"
-        dataset.attrs["geospatial_lon_units"] = "degrees east"
+        dataset.attrs["geospatial_lat_units"] = "degrees_north"
+        dataset.attrs["geospatial_lon_units"] = "degrees_east"
 
         # dataset.attrs["geospatial_lat_resolution"] = "%d m" % round(resolution_m_lat)
         # dataset.attrs["geospatial_lon_resolution"] = "%d m" % round(resolution_m_lon)
