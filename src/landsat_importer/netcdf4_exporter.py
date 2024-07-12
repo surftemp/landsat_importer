@@ -145,13 +145,18 @@ class Netcdf4Exporter:
 
             if self.landsat_metadata.is_integer(band):
                 data = data.astype(int)
-                encodings[band_name] = {'dtype': 'int32'}
+                encodings[band_name] = {'dtype': 'int32', "_FillValue": -999}
             else:
                 encodings[band_name] = {'dtype':'float32'}
 
             encodings[band_name].update(ecomp)
 
             data = np.expand_dims(data, axis=0)
+
+            # where QA_PIXEL bit 0 is set there is no data.  convert to NaN to make it easier for downstream processing to handle
+            if band == self.landsat_metadata.get_qa_band():
+                data = np.where(data == 1, np.nan, data)
+
             dataset[band_name] = xr.DataArray(data=data, dims=("time", "nj", "ni"))
 
             if units:
@@ -175,6 +180,7 @@ class Netcdf4Exporter:
                 dataset[band_name].attrs["flag_masks"] = np.array(flag_masks, flag_type)
                 # Convert flag meanings into valid CF attribute
                 dataset[band_name].attrs["flag_meanings"] = ' '.join(s.replace(' ', '_') for s in flag_meanings)
+
 
         if include_angles and self.landsat_metadata.get_collection() == 1:
             # for collection 2, angles should already be included via bands SAA,SZA,VAA,VZA converted from TIFFs
