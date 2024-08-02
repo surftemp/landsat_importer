@@ -21,13 +21,16 @@ import enum
 
 import xarray
 
-from landsat_importer.landsat_metadata import LandsatMetadata, OLIFormats
+from .oli_formats import OLIFormats
+from .landsat_metadata_factory import LandsatMetadataFactory
+
 from landsat_importer import VERSION
 from landsat_importer.tiff_importer import TiffImporter
 from landsat_importer.netcdf4_exporter import Netcdf4Exporter
 
 import numpy as np
 import os
+import json
 import gc
 import time
 import logging
@@ -63,7 +66,8 @@ class Processor:
         self.target_bands = []
 
         # load up metadata for this scene
-        self.landsat_metadata = LandsatMetadata(input_path, oli_format=oli_format)
+        self.landsat_metadata = LandsatMetadataFactory.create_metadata(input_path, oli_format=oli_format)
+        self.logger.info(json.dumps(self.landsat_metadata.metadata, indent=4))
 
         # find the paths associated with the various bands that could exist in this scene
         # note that the input folder may not contain all the expected files
