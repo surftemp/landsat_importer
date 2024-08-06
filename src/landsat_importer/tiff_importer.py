@@ -50,17 +50,18 @@ class TiffImporter:
         Open the TIFF file and store in an array.
         """
         da = rioxarray.open_rasterio(path).squeeze(drop=True)
+        encoding = da.encoding
         if band == "8":
             da = da[::2, ::2]
 
         if '_FillValue' in da.attrs:
             da = da.where(da != da._FillValue)
         elif is_int:
-            da = da.astype(int)
+            da = da.astype(np.int32)
         else:
-            da = da.astype(float)
+            da = da.astype(np.float32)
 
-        return da
+        return da, encoding
 
     @staticmethod
     def DN_to_refl(image_data, M_ro, A_ro):

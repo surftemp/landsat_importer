@@ -129,7 +129,7 @@ class Processor:
             self.logger.info(f"Processing band {band}")
 
             # get the data imported from TIFF format
-            band_data = self.importer.import_tiff(band, self.band_paths[band],
+            band_data, encoding = self.importer.import_tiff(band, self.band_paths[band],
                                              self.landsat_metadata.is_integer(band))
 
             # decode pixel values according to the encoding parameters stored in the
@@ -152,11 +152,23 @@ class Processor:
             if comment:
                 processed_band_data.attrs["comment"] = comment
 
+            if band == self.landsat_metadata.get_qa_band():
+                # Remove some incorrect attributes
+                for attr in ['AREA_OR_POINT', 'scale_factor', 'add_offset', 'units']:
+                    if attr in processed_band_data.attrs:
+                        del processed_band_data.attrs[attr]
+                (flag_masks, flag_values, flag_meanings) = self.landsat_metadata.get_qa_flag_metadata()
+                flag_type = processed_band_data.dtype
+                processed_band_data.attrs["flag_values"] = np.array(flag_values, flag_type)
+                processed_band_data.attrs["flag_masks"] = np.array(flag_masks, flag_type)
+                # Convert flag meanings into valid CF attribute
+                processed_band_data.attrs["flag_meanings"] = ' '.join(s.replace(' ', '_') for s in flag_meanings)
+
             layers[band] = processed_band_data
+            layers[band].encoding = encoding
 
         # Combine all the bands into a single dataset
         self.dataset = xarray.Dataset(layers)
-
         end_time = time.time()
         return end_time - start_time
 

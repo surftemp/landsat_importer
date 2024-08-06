@@ -60,7 +60,7 @@ class Netcdf4Exporter:
         self.logger = logging.getLogger("Netcdf4Exporter")
 
 
-    def export(self,input_path, dataset, bands, to_path, history=""):
+    def export(self,input_path, dataset, bands, to_path, history="", add_latlon=True):
         """
         Export an imported scene
 
@@ -71,22 +71,23 @@ class Netcdf4Exporter:
             to_path: the path to which netcdf4 data is to be exported
             history: string to supply the processing history to add to global metadata
         """
-
         dataset = dataset.expand_dims('time')
         dataset = dataset.rio.write_coordinate_system()
 
-        nmap = {b:self.landsat_metadata.get_name(b) for b in bands}
-        dataset = dataset.rename(nmap)
+        ecomp = {'zlib': True, 'complevel': 5}
 
         # Calculate pixel longitude, latitudes.
         # Do this after the scene has been clipped.
-        self.logger.info("Computing lat/lon mapping")
-        transformer = Transformer.from_crs(dataset.spatial_ref.projected_crs_name, "EPSG:4326")
-        lat, lon = transformer.transform(*np.meshgrid(dataset.x, dataset.y))
-        dataset['lat'] = ('y', 'x'), lat, {'standard_name':'latitude',  'units':'degrees_north'}
-        dataset['lon'] = ('y', 'x'), lon, {'standard_name':'longitude', 'units':'degrees_east'}
-        self.logger.info("Starting Netcdf4 Export")
+        if add_latlon:
+            self.logger.info("Computing lat/lon mapping")
+            transformer = Transformer.from_crs(dataset.spatial_ref.projected_crs_name, "EPSG:4326")
+            lat, lon = transformer.transform(*np.meshgrid(dataset.x, dataset.y))
+            dataset['lat'] = ('y', 'x'), lat, {'standard_name':'latitude',  'units':'degrees_north'}
+            dataset.lat.encoding.update(ecomp)
+            dataset['lon'] = ('y', 'x'), lon, {'standard_name':'longitude', 'units':'degrees_east'}
+            dataset.lon.encoding.update(ecomp)
 
+        self.logger.info("Starting Netcdf4 Export")
         dataset.attrs['landsat_importer_version'] = LANDSAT_IMPORTER_VERSION
         dataset.attrs['source_file'] = os.path.split(input_path)[-1]
         dataset.attrs['source'] = self.landsat_metadata.get_id()
@@ -135,45 +136,29 @@ class Netcdf4Exporter:
         for (key,value) in self.inject_metadata.items():
             dataset.attrs[key] = value
 
-        ecomp = {'zlib': True, 'complevel': 5}
-        encodings = {"time": {"units": "seconds since 1978-01-01"}}
 
-        encodings['lat'] = ecomp
-        encodings['lon'] = ecomp
 
         for band in bands:
-            # get metadata to write into the exported variable attributes
-            # should be empty string if not relevant or CF-compliant string if applicable
-            band_name = self.landsat_metadata.get_name(band)
+            if add_latlon:
+                dataset[band].attrs['coordinates'] = 'lon lat'
 
             if self.landsat_metadata.is_integer(band):
-                encodings[band_name] = {'dtype': 'int32', "_FillValue": -999}
+                dataset[band].encoding.update({'dtype': 'int32', "_FillValue": -999})
             else:
-                encodings[band_name] = {'dtype':'float32'}
+                dataset[band].encoding.update({'dtype':'float32'})
 
-            encodings[band_name].update(ecomp)
+            dataset[band].encoding.update(ecomp)
 
-
-            # where QA_PIXEL bit 0 is set there is no data.  convert to NaN to make it easier for downstream processing to handle
-
-            dataset[band_name].attrs['coordinates'] = 'lon lat'
-
-            if band == self.landsat_metadata.get_qa_band():
-                (flag_masks, flag_values, flag_meanings) = self.landsat_metadata.get_qa_flag_metadata()
-                # Output datatype may be modified via the encodings dictionary, so
-                # need to check both encodings and current array to get correct type
-                flag_type = encodings[band_name].get('dtype') or dataset[band_name].dtype
-                dataset[band_name].attrs["flag_values"] = np.array(flag_values, flag_type)
-                dataset[band_name].attrs["flag_masks"] = np.array(flag_masks, flag_type)
-                # Convert flag meanings into valid CF attribute
-                dataset[band_name].attrs["flag_meanings"] = ' '.join(s.replace(' ', '_') for s in flag_meanings)
-
+        # Rename variables to use common netCDF names
+        nmap = {b:self.landsat_metadata.get_name(b) for b in bands}
+        dataset = dataset.rename(nmap)
 
         dataset["time"] = xr.DataArray(data=np.array([self.landsat_metadata.get_acquisition_timestamp()],dtype='datetime64[ns]'), dims=('time'),
                                       attrs={"standard_name": "time", "long_name":"reference time of observations"})
+        dataset.time.encoding.update(dtype='int32', units='seconds since 1978-01-01')
 
 
-        dataset.to_netcdf(to_path, encoding=encodings)
+        dataset.to_netcdf(to_path)
         self.logger.info("Netcdf4 Export complete to %s" % to_path)
 
 

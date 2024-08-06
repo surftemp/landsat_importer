@@ -238,6 +238,9 @@ class Landsat89Metadata(LandsatMetadata):
             self.standard_names["10"] = "toa_brightness_temperature"
             self.standard_names["11"] = "toa_brightness_temperature"
 
+            self.long_names[self.get_qa_band()] = 'QA Band'
+            self.standard_names[self.get_qa_band()] = 'quality_flag'
+
         # for input bands identified by a number, prepend "B" to provide the output name
         for numeric_band in numeric_bands:
             self.names[numeric_band] = "B" + numeric_band
