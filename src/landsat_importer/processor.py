@@ -76,8 +76,7 @@ class Processor:
 
         self.logger.info("Read metadata: "+str(self.landsat_metadata))
 
-        self.lats = self.lons = None
-        self.output_layers = []
+        self.dataset = None
         self.min_lon = self.max_lon = self.min_lat = self.max_lat = None
 
     def check_bands(self, target_bands):
@@ -124,14 +123,10 @@ class Processor:
 
         self.logger.info("Acquired at " + str(self.landsat_metadata.get_acquisition_timestamp()))
 
-        self.logger.info("Computing lat/lon mapping")
-        # TODO ensure not band 8
-
-        self.lats, self.lons = self.importer.latlon_image(self.band_paths[self.target_bands[0]])
-
+        layers = {}
         for band in self.target_bands:
             gc.collect()
-            self.logger.info("Processing band %s" % (band))
+            self.logger.info(f"Processing band {band}")
 
             # get the data imported from TIFF format
             band_data = self.importer.import_tiff(band, self.band_paths[band],
@@ -140,7 +135,27 @@ class Processor:
             # decode pixel values according to the encoding parameters stored in the
             # landsat metadata
             processed_band_data = self.preprocess_band(self.landsat_metadata, band, band_data)
-            self.output_layers.append((band,processed_band_data))
+
+            long_name = self.landsat_metadata.get_long_name(band)
+            standard_name = self.landsat_metadata.get_standard_name(band)
+            units = self.landsat_metadata.get_units(band)
+            comment = self.landsat_metadata.get_comment(band)
+            if long_name:
+                processed_band_data.attrs["long_name"] = long_name
+
+            if standard_name:
+                processed_band_data.attrs["standard_name"] = standard_name
+
+            if units:
+                processed_band_data.attrs["units"] = units
+
+            if comment:
+                processed_band_data.attrs["comment"] = comment
+
+            layers[band] = processed_band_data
+
+        # Combine all the bands into a single dataset
+        self.dataset = xarray.Dataset(layers)
 
         end_time = time.time()
         return end_time - start_time
@@ -164,7 +179,6 @@ class Processor:
             return TiffImporter.decode(data, mult, add, fill)
         else:
             if landsat_metadata.is_reflectance(band) or landsat_metadata.is_corrected_reflectance(band):
-                data = np.where(data == 0.0, np.nan, data)
                 A_rho, M_rho, sun_elevation = landsat_metadata.get_reflectance_correction(band)
                 refl = TiffImporter.DN_to_refl(data, M_rho, A_rho)
                 if landsat_metadata.is_corrected_reflectance(band):
@@ -172,7 +186,6 @@ class Processor:
                 else:
                     return refl
             elif landsat_metadata.is_bt(band) or landsat_metadata.is_radiance(band):
-                data = np.where(data == 0.0, np.nan, data)
                 AL, ML = landsat_metadata.get_radiance_correction(band)
                 rad = TiffImporter.DN_to_radiance(data, ML, AL)
                 if landsat_metadata.is_bt(band):
@@ -278,6 +291,11 @@ class Processor:
         else:
             shrink = True
 
-        exporter.export(input_path=self.input_path, lats=self.lats, lons=self.lons, output_layers=self.output_layers,
-                        bounds=((min_lat,min_lon),(max_lat,max_lon)), include_angles=include_angles,
-                        history=history,to_path=output_path,shrink=shrink)
+        if shrink:
+            # rioxarray clip_box will ensure that the requested region is fully covered
+            dataset = self.dataset.rio.clip_box(min_lon, min_lat, max_lon, max_lat, crs="EPSG:4326")
+        else:
+            dataset = self.dataset
+
+        exporter.export(input_path=self.input_path, dataset=dataset, bands=self.target_bands,
+                        history=history,to_path=output_path)
