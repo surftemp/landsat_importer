@@ -187,8 +187,7 @@ class Processor:
         if landsat_metadata.is_level2(band):
             add = landsat_metadata.get_level2_shift(band)
             mult = landsat_metadata.get_level2_scale(band)
-            fill = landsat_metadata.get_level2_fillvalue(band)
-            return TiffImporter.decode(data, mult, add, fill)
+            return TiffImporter.decode(data, mult, add, None)
         else:
             if landsat_metadata.is_reflectance(band) or landsat_metadata.is_corrected_reflectance(band):
                 A_rho, M_rho, sun_elevation = landsat_metadata.get_reflectance_correction(band)
