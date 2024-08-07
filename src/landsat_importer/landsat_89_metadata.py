@@ -79,6 +79,17 @@ def get_cloud_shadow_confidence():
 def get_cirrus_confidence():
     return lambda q: (q >> 14) & 3
 
+product_info = {
+    'https://doi.org/10.5066/P975CC9B': {
+        'title': 'Landsat 8-9 Operational Land Imager and Thermal Infrared Sensor Collection 2 Level-1 Data',
+        'summary': 'Landsat 8-9 Operational Land Imager (OLI) and Thermal Infrared Sensor (TIRS) Collection 2 Level-1 15- to 30-meter multispectral data.',
+        },
+    'https://doi.org/10.5066/P9OGBGM6': {
+        'title': 'Landsat 8-9 OLI/TIRS Collection 2 Level-2 Science Products',
+        'summary': 'Landsat 8-9 Operational Land Imager (OLI) and Thermal Infrared (TIRS) Collection 2 Level-2 Science Products 30-meter multispectral data.',
+        }
+    }
+
 
 class Landsat89Metadata(LandsatMetadata):
 
@@ -140,6 +151,16 @@ class Landsat89Metadata(LandsatMetadata):
 
         self.product_id = self["LANDSAT_METADATA_FILE/PRODUCT_CONTENTS/LANDSAT_PRODUCT_ID"]
         self.scene_id = self["LANDSAT_METADATA_FILE/LEVEL1_PROCESSING_RECORD/LANDSAT_SCENE_ID"]
+        self.doi = self['LANDSAT_METADATA_FILE/PRODUCT_CONTENTS/DIGITAL_OBJECT_IDENTIFIER']
+        try:
+            self.title = product_info[self.doi]['title']
+            self.summary = product_info[self.doi]['summary']
+        except KeyError:
+            self.title = f'{self.spacecraft_id} {self.processing_level} data'
+            self.summary = ''
+            pass
+        self.acknowledgement = self['LANDSAT_METADATA_FILE/PRODUCT_CONTENTS/ORIGIN']
+        self.software_l1 = self['LANDSAT_METADATA_FILE/LEVEL1_PROCESSING_RECORD/PROCESSING_SOFTWARE_VERSION']
 
         if self.processing_level.startswith("L1"):
             self.level = 1
@@ -147,6 +168,7 @@ class Landsat89Metadata(LandsatMetadata):
         elif self.processing_level.startswith("L2SP"):
             self.level = 2
             oli_bands = [str(b) for b in range(1,8)] # OLI bands are 1-7
+            self.software_l2 = self['LANDSAT_METADATA_FILE/LEVEL2_PROCESSING_RECORD/PROCESSING_SOFTWARE_VERSION']
         else:
             raise Exception("Unsupported processing level %s" % self.processing_level)
 

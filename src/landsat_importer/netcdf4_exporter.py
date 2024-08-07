@@ -22,11 +22,12 @@ routines for outputting regridded data to netcdf4 and png formats
 import os
 import getpass
 import datetime
+import logging
+
+import netCDF4
 import xarray as xr
 from pyproj import Transformer
 import numpy as np
-import json
-import logging
 
 from landsat_importer import VERSION as LANDSAT_IMPORTER_VERSION
 # YYYY-MM-DDThh:mm:ss<tz>
@@ -88,19 +89,31 @@ class Netcdf4Exporter:
             dataset.lon.encoding.update(ecomp)
 
         self.logger.info("Starting Netcdf4 Export")
-        dataset.attrs['landsat_importer_version'] = LANDSAT_IMPORTER_VERSION
-        dataset.attrs['source_file'] = os.path.split(input_path)[-1]
-        dataset.attrs['source'] = self.landsat_metadata.get_id()
+        dataset.attrs['title'] = self.landsat_metadata.title
+        dataset.attrs['summary'] = self.landsat_metadata.summary
+        dataset.attrs['Conventions'] = 'CF-1.11, ACDD-1.3'
+        dataset.attrs["history"] = history
 
-        dataset.attrs['platform'] = self.landsat_metadata.get_spacecraft_id()
+        dataset.attrs['level1_software_version'] = self.landsat_metadata.software_l1
+        if hasattr(self.landsat_metadata, 'software_l2'):
+            dataset.attrs['level2_software_version'] = self.landsat_metadata.software_l2
+        dataset.attrs['landsat_importer_version'] = LANDSAT_IMPORTER_VERSION
+        dataset.attrs['netcdf_version_id'] = netCDF4.getlibversion()
+
+        dataset.attrs["date_created"] = date_format(datetime.datetime.now())
 
         acquistion_dt = self.landsat_metadata.get_acquisition_timestamp()
         dataset.attrs['acquisition_time'] = date_format(acquistion_dt)
         dataset.attrs['time_coverage_start'] = date_format(acquistion_dt-datetime.timedelta(seconds=12))
         dataset.attrs['time_coverage_end'] = date_format(acquistion_dt+datetime.timedelta(seconds=12))
 
-        dataset.attrs['processing_level'] = str(self.landsat_metadata.get_processing_level())
-        dataset.attrs['collection'] = np.int32(self.landsat_metadata.collection)
+        dataset.attrs['source_file'] = os.path.split(input_path)[-1]
+        dataset.attrs['source'] = self.landsat_metadata.get_id()
+
+        dataset.attrs['platform'] = self.landsat_metadata.get_spacecraft_id()
+        dataset.attrs["sensor"] = dataset.attrs["instrument"] = self.landsat_metadata.get_sensor_id()
+        dataset.attrs['metadata_link'] = self.landsat_metadata.doi
+        dataset.attrs['references'] = self.landsat_metadata.doi
 
         # Get the bounding box. Note this includes the pixel edges, so will be half
         # a pixel larger than the outermost lat/lon positions
@@ -118,11 +131,11 @@ class Netcdf4Exporter:
         dataset.attrs["geospatial_lon_resolution"] = f'{res[0]} {dataset.x.units}'
         # dataset.attrs["spatial_resolution"] = "%d m" % round((resolution_m_lat + resolution_m_lon) * 0.5)
 
+        dataset.attrs['processing_level'] = str(self.landsat_metadata.get_processing_level())
+        dataset.attrs['collection'] = np.int32(self.landsat_metadata.collection)
         dataset.attrs["cdm_data_type"] = "grid"
-        dataset.attrs["history"] = history
+
         dataset.attrs["acknowledgement"] = "Image courtesy of the U.S. Geological Survey"
-        dataset.attrs["date_created"] = date_format(datetime.datetime.now())
-        dataset.attrs["sensor"] = dataset.attrs["instrument"] = self.landsat_metadata.get_sensor_id()
 
         username = "?"
         try:
@@ -131,7 +144,6 @@ class Netcdf4Exporter:
             pass
 
         dataset.attrs["creator_name"] = username
-        dataset.attrs["date_created"] = date_format(datetime.datetime.now().astimezone())
 
         for (key,value) in self.inject_metadata.items():
             dataset.attrs[key] = value
