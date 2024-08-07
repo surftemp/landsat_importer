@@ -24,7 +24,7 @@ import math
 import rioxarray
 import xarray as xr
 from pyproj import Transformer
-import rasterio
+
 
 class TiffImporter:
 
@@ -49,17 +49,19 @@ class TiffImporter:
         """
         Open the TIFF file and store in an array.
         """
-        object_image = rasterio.open(path).read(1)
+        da = rioxarray.open_rasterio(path).squeeze(drop=True)
+        encoding = da.encoding
         if band == "8":
-            array_image = np.array(object_image[::2, ::2])
-        else:
-            array_image = np.array(object_image)
+            da = da[::2, ::2]
 
-        if is_int:
-            array_image = array_image.astype(int)
+        if '_FillValue' in da.attrs:
+            da = da.where(da != da._FillValue)
+        elif is_int:
+            da = da.astype(np.int32)
         else:
-            array_image = array_image.astype(float)
-        return array_image
+            da = da.astype(np.float32)
+
+        return da, encoding
 
     @staticmethod
     def DN_to_refl(image_data, M_ro, A_ro):

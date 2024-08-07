@@ -238,6 +238,9 @@ class Landsat89Metadata(LandsatMetadata):
             self.standard_names["10"] = "toa_brightness_temperature"
             self.standard_names["11"] = "toa_brightness_temperature"
 
+            self.long_names[self.get_qa_band()] = 'QA Band'
+            self.standard_names[self.get_qa_band()] = 'quality_flag'
+
         # for input bands identified by a number, prepend "B" to provide the output name
         for numeric_band in numeric_bands:
             self.names[numeric_band] = "B" + numeric_band
@@ -261,12 +264,10 @@ class Landsat89Metadata(LandsatMetadata):
 
     def get_reflectance_correction(self,band):
         # return (add,mult,sun_elevation)
-        root = "L1_METADATA_FILE/RADIOMETRIC_RESCALING"
-        add = self[root+"/REFLECTANCE_ADD_BAND_%s" % band]
-        mult = self[root+"/REFLECTANCE_MULT_BAND_%s" % band]
+        add = self[f'LANDSAT_METADATA_FILE/LEVEL1_RADIOMETRIC_RESCALING/REFLECTANCE_ADD_BAND_{band}']
+        mult = self[f'LANDSAT_METADATA_FILE/LEVEL1_RADIOMETRIC_RESCALING/REFLECTANCE_MULT_BAND_{band}']
+        sun_elevation = self['LANDSAT_METADATA_FILE/IMAGE_ATTRIBUTES/SUN_ELEVATION']
 
-        root = "LANDSAT_METADATA_FILE/IMAGE_ATTRIBUTES"
-        sun_elevation = self[root+"/SUN_ELEVATION"]
         if add is None or mult is None:
             raise Exception("get_reflectance_correction")
         else:

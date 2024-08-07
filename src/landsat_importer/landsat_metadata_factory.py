@@ -24,7 +24,7 @@ class LandsatMetadataFactory:
                     path = os.path.join(scene_path, filename)
         elif os.path.isfile(scene_path):
             ext = os.path.splitext(scene_path)[1]
-            if ext in [".xml"]:
+            if ext in [".txt", ".xml"]:
                 path = scene_path
             else:
                 raise Exception("input path does not point to a metadata xml file")
@@ -35,7 +35,10 @@ class LandsatMetadataFactory:
         if path is None:
             raise Exception("No MTL.XML file found in scene")
 
-        metadata = LandsatMetadataFactory.read_metadata(path)
+        if path.endswith('xml'):
+            metadata = LandsatMetadataFactory.read_metadata_xml(path)
+        else:
+            metadata = LandsatMetadataFactory.read_metadata_odl(path)
 
         spacecraft_id = metadata.get("LANDSAT_METADATA_FILE", {}).get("IMAGE_ATTRIBUTES", {}).get("SPACECRAFT_ID", "")
         if spacecraft_id == "LANDSAT_7":
@@ -44,7 +47,7 @@ class LandsatMetadataFactory:
             return Landsat89Metadata(metadata, path, oli_format=oli_format)
 
     @staticmethod
-    def read_metadata(path):
+    def read_metadata_xml(path):
         metadata = {}
         with open(path) as file:
             doc = xml.dom.minidom.parseString(file.read())
@@ -64,6 +67,33 @@ class LandsatMetadataFactory:
 
             v = parse(doc.documentElement)
             metadata[doc.documentElement.tagName] = v
+        return metadata
+
+    @staticmethod
+    def read_metadata_odl(path):
+        """Read Landsat metadata from ODL format .txt file"""
+        metadata = {}
+        groups = []
+        with open(path) as file:
+            for line in file:
+                line = line.strip()
+                if line == "END":
+                    break
+                # line should be of form NAME = VALUE
+                name, var = line.split(' = ', 1)
+                if var.startswith('"') and var.endswith('"'):
+                    var = var[1:-1]
+                if name == "GROUP":
+                    groups.append(var)
+                elif name == "END_GROUP":
+                    groups = groups[:-1]
+                else:
+                    m = metadata
+                    for group in groups:
+                        if group not in m:
+                            m[group] = {}
+                        m = m[group]
+                    m[name] = var
         return metadata
 
 
