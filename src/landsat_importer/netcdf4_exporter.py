@@ -61,7 +61,7 @@ class Netcdf4Exporter:
         self.logger = logging.getLogger("Netcdf4Exporter")
 
 
-    def export(self,input_path, dataset, bands, to_path, history="", add_latlon=True):
+    def export(self, input_path, dataset, bands, to_path, history="", add_latlon=True, geo_type='float32'):
         """
         Export an imported scene
 
@@ -71,9 +71,14 @@ class Netcdf4Exporter:
             bands: list of bands in the dataset
             to_path: the path to which netcdf4 data is to be exported
             history: string to supply the processing history to add to global metadata
+            add_latlon: calculate and store per-pixel latitude longitude values
+            geo_type: storage type for geolocation (x/y and lat/lon coordinates)
         """
         dataset = dataset.expand_dims('time')
         dataset = dataset.rio.write_coordinate_system()
+
+        dataset.x.encoding['dtype'] = geo_type
+        dataset.y.encoding['dtype'] = geo_type
 
         ecomp = {'zlib': True, 'complevel': 5}
 
@@ -84,9 +89,9 @@ class Netcdf4Exporter:
             transformer = Transformer.from_crs(dataset.spatial_ref.projected_crs_name, "EPSG:4326")
             lat, lon = transformer.transform(*np.meshgrid(dataset.x, dataset.y))
             dataset['lat'] = ('y', 'x'), lat, {'standard_name':'latitude',  'units':'degrees_north'}
-            dataset.lat.encoding.update(ecomp)
+            dataset.lat.encoding.update(ecomp, dtype=geo_type)
             dataset['lon'] = ('y', 'x'), lon, {'standard_name':'longitude', 'units':'degrees_east'}
-            dataset.lon.encoding.update(ecomp)
+            dataset.lon.encoding.update(ecomp, dtype=geo_type)
 
         self.logger.info("Starting Netcdf4 Export")
         dataset.attrs['title'] = self.landsat_metadata.title
