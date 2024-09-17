@@ -44,23 +44,16 @@ class LandsatMetadata:
         for file in files:
             for band in bands:
                 suffix = band_suffixes[band]
-                if file.startswith(stem) and file.endswith(suffix):
-                    if band in band_paths:
-                        self.logger.warning("Found multiple TIF files with same suffix %s for band %s, ignoring %s"% (suffix,band,file))
+                if file == stem + "_" + suffix:
                     band_paths[band] = os.path.join(folder, file)
         return band_paths
 
-    def is_bt(self, band):
-        return band in ["10", "11"]
-
-    def is_radiance(self, band):
-        return band in ["1", "2", "3", "4", "5", "6", "7", "8", "9"] and self.oli_format is OLIFormats.RADIANCE
-
-    def is_reflectance(self, band):
-        return band in ["1", "2", "3", "4", "5", "6", "7", "8", "9"] and self.oli_format is OLIFormats.REFLECTANCE
-
-    def is_corrected_reflectance(self, band):
-        return band in ["1", "2", "3", "4", "5", "6", "7", "8", "9"] and self.oli_format is OLIFormats.CORRECTED_REFLECTANCE
+    def get_band_number(self, band):
+        if band.startswith("B"):
+            try:
+                return str(int(band[1:]))
+            except:
+                return None
 
     def is_integer(self, band):
         return band in ["QA", "QA_PIXEL", "QA_AEROSOL", "QA_RADSAT"]

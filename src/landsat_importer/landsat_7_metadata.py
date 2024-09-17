@@ -31,22 +31,19 @@ import logging
 # https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/ecy.1730
 # https://www.usgs.gov/faqs/what-are-band-designations-landsat-satellites
 
-# the keys are the band numbers for Landsat 8/9
-# the values map to the closest equivalemt files in landsat 7 or "" if there is no equivalent
+# the keys are the band numbers for Landsat 7
+
 
 suffixes_l1 = {
-    "1" : "",
-    "2" : "B1.TIF",
-    "3" : "B2.TIF",
-    "4" : "B3.TIF",
-    "5" : "B4.TIF",
-    "6" : "B5.TIF",
-    "7" : "B7.TIF",
-    "8" : "B8.TIF",
-    "9" : "",
-    "10" : "B6_VCID_1.TIF",
-    "11" : "B6_VCID_2.TIF",
-    "QA" : "",
+    "B1" : "B1.TIF",
+    "B2" : "B2.TIF",
+    "B3" : "B3.TIF",
+    "B4" : "B4.TIF",
+    "B5" : "B5.TIF",
+    "B6_1" : "B6_VCID_1.TIF",
+    "B6_2" : "B6_VCID_2.TIF",
+    "B7" : "B7.TIF",
+    "B8" : "B8.TIF",
     "MTL" : "MTL.txt",
     "QA_PIXEL": "QA_PIXEL.TIF",
     "VAA": "VAA.TIF",
@@ -56,13 +53,11 @@ suffixes_l1 = {
 }
 
 suffixes_l2 = {
-    "1" : "",
-    "2" : "SR_B1.TIF",
-    "3" : "SR_B2.TIF",
-    "4" : "SR_B3.TIF",
-    "5" : "SR_B4.TIF",
-    "6" : "SR_B5.TIF",
-    "7" : "SR_B7.TIF",
+    "B1" : "SR_B1.TIF",
+    "B2" : "SR_B2.TIF",
+    "B3" : "SR_B3.TIF",
+    "B4" : "SR_B4.TIF",
+    "B5" : "SR_B5.TIF",
     "ST": "ST_B6.TIF",
     "ST_QA": "ST_QA.TIF",
     "EMIS": "ST_EMIS.TIF",
@@ -77,44 +72,22 @@ suffixes_l2 = {
     "MTL" : "MTL.txt"
 }
 
-# map from L8/9 band names to L7 band names
-
-band_mapping = {
-    "1" : "",
-    "2" : "1",
-    "3" : "2",
-    "4" : "3",
-    "5" : "4",
-    "6" : "5",
-    "7" : "7",
-    "8" : "8",
-    "9" : "",
-    "10" : "6_VCID_1",
-    "11" : "6_VCID_2",
-    "ST": "ST_B6",
-    "QA" : "",
-    "QA_PIXEL": "QA_PIXEL",
-    "VAA": "VAA",
-    "VZA": "VZA",
-    "SAA": "SAA",
-    "SZA": "SZA",
-    "ST_QA": "ST_QA",
-    "EMIS": "ST_EMIS",
-    "EMSD": "ST_EMSD",
-    "TRAD": "ST_TRAD",
-    "URAD": "ST_URAD",
-    "DRAD": "ST_DRAD",
-    "ATRAN": "ST_ATRAN",
-    "QA_AEROSOL": "",
-    "QA_RADSAT": "QA_RADSAT",
-}
-
 def get_cloud_confidence():
     return lambda q: (q >> 8) & 3
 
 def get_cloud_shadow_confidence():
     return lambda q: (q >> 10) & 3
 
+product_info = {
+    'https://doi.org/10.5066/P975CC9B': {
+        'title': 'Landsat 8-9 Operational Land Imager and Thermal Infrared Sensor Collection 2 Level-1 Data',
+        'summary': 'Landsat 8-9 Operational Land Imager (OLI) and Thermal Infrared Sensor (TIRS) Collection 2 Level-1 15- to 30-meter multispectral data.',
+        },
+    'https://doi.org/10.5066/P9OGBGM6': {
+        'title': 'Landsat 8-9 OLI/TIRS Collection 2 Level-2 Science Products',
+        'summary': 'Landsat 8-9 Operational Land Imager (OLI) and Thermal Infrared (TIRS) Collection 2 Level-2 Science Products 30-meter multispectral data.',
+        }
+    }
 
 class Landsat7Metadata(LandsatMetadata):
     # https://www.usgs.gov/media/files/landsat-8-data-users-handbook P55
@@ -178,6 +151,14 @@ class Landsat7Metadata(LandsatMetadata):
 
         self.product_id = self["LANDSAT_METADATA_FILE/PRODUCT_CONTENTS/LANDSAT_PRODUCT_ID"]
         self.scene_id = self["LANDSAT_METADATA_FILE/LEVEL1_PROCESSING_RECORD/LANDSAT_SCENE_ID"]
+        self.doi = self['LANDSAT_METADATA_FILE/PRODUCT_CONTENTS/DIGITAL_OBJECT_IDENTIFIER']
+
+        # FIXME
+        self.title = f'{self.spacecraft_id} {self.processing_level} data'
+        self.summary = ''
+
+        self.acknowledgement = self['LANDSAT_METADATA_FILE/PRODUCT_CONTENTS/ORIGIN']
+        self.software_l1 = self['LANDSAT_METADATA_FILE/LEVEL1_PROCESSING_RECORD/PROCESSING_SOFTWARE_VERSION']
 
         if self.processing_level.startswith("L1"):
             self.level = 1
@@ -222,14 +203,13 @@ class Landsat7Metadata(LandsatMetadata):
 
         self.available_bands = [] # the names of bands in the input data
         self.comments = {} # partial mapping from input band name to a comment in the output variable
-        self.names = {} # partial mapping from input band name to a the name of the output variable
+        self.names = {} # partial mapping from input band name to the name of the output variable
         self.standard_names = {} # partial mapping from input band name to the standard_name of the output variable
         self.long_names = {} # partial mapping from input band name to the long_name of the output variable
         self.units = {} # partial mapping from input band name to the units of the output variable
 
         if self.processing_level == "L2SP":
-            numeric_bands = [ "2", "3", "4", "5", "6", "7"]
-            self.available_bands += numeric_bands
+            self.available_bands = [ "B1", "B2", "B3", "B4", "B5"]
             self.available_bands += ["ST", "ST_QA", "EMIS", "EMSD", "TRAD", "URAD", "DRAD", "ATRAN",
                                     "QA_PIXEL", "QA_AEROSOL", "QA_RADSAT"]
             self.units["ST"] = "K"
@@ -241,12 +221,8 @@ class Landsat7Metadata(LandsatMetadata):
             self.standard_names["ST"] = "surface_temperature"
 
         else:
-            numeric_bands = ["2", "3", "4", "5", "6", "7", "8", "10", "11"]
-            self.available_bands += numeric_bands
+            self.available_bands = ["B1", "B2", "B3", "B4", "B5", "B6_1", "B6_2", "B7", "B8"]
             self.available_bands.append(self.get_qa_band())
-
-
-
             angle_bands = ["VAA","VZA","SAA","SZA"]
             self.available_bands += angle_bands
 
@@ -263,7 +239,6 @@ class Landsat7Metadata(LandsatMetadata):
             self.standard_names["VZA"] = "sensor_zenith_angle"
             self.standard_names["VAA"] = "sensor_azimuth_angle"
 
-
             self.long_names["SZA"] = "solar zenith angle"
             self.long_names["SAA"] = "solar azimuth angle"
             self.long_names["VZA"] = "satellite zenith angle"
@@ -272,15 +247,13 @@ class Landsat7Metadata(LandsatMetadata):
             self.comments["VAA"] = "The satellite azimuth angle at the time of the observations"
             self.comments["VZA"] = "The satellite zenith angle at the time of the observations"
 
-            self.units["10"] = "K"
-            self.units["11"] = "K"
+            self.units["B6_1"] = "K"
+            self.units["B6_2"] = "K"
 
             self.standard_names["10"] = "toa_brightness_temperature"
             self.standard_names["11"] = "toa_brightness_temperature"
 
-        # for input bands identified by a number, prepend "B" to provide the output name
-        for numeric_band in numeric_bands:
-            self.names[numeric_band] = "B" + numeric_band
+
 
         for band in oli_bands:
             self.units[band] = oli_units
@@ -289,6 +262,25 @@ class Landsat7Metadata(LandsatMetadata):
             if oli_comment:
                 self.comments[band] = oli_comment
 
+    def get_band_number(self, band):
+        if band == "B6_1":
+            return "6_VCID_1"
+        elif band == "B6_2":
+            return "6_VCID_2"
+        else:
+            return super().get_band_number(band)
+
+    def is_bt(self, band):
+        return band in ["B6_1", "B6_2"]
+
+    def is_radiance(self, band):
+        return band in ["B1", "B2", "B3", "B4", "B5", "B7", "B8"] and self.oli_format is OLIFormats.RADIANCE
+
+    def is_reflectance(self, band):
+        return band in ["B1", "B2", "B3", "B4", "B5", "B7", "B8"] and self.oli_format is OLIFormats.REFLECTANCE
+
+    def is_corrected_reflectance(self, band):
+        return band in ["B1", "B2", "B3", "B4", "B5", "B7", "B8"] and self.oli_format is OLIFormats.CORRECTED_REFLECTANCE
 
     def get_solar_angles(self):
         root = "LANDSAT_METADATA_FILE/IMAGE_ATTRIBUTES"
@@ -300,12 +292,11 @@ class Landsat7Metadata(LandsatMetadata):
 
     def get_reflectance_correction(self,band):
         # return (add,mult,sun_elevation)
-        l7_band = band_mapping.get(band,"")
 
         root = "LANDSAT_METADATA_FILE/LEVEL1_RADIOMETRIC_RESCALING"
 
-        add = self[root+"/REFLECTANCE_ADD_BAND_%s" % l7_band]
-        mult = self[root+"/REFLECTANCE_MULT_BAND_%s" % l7_band]
+        add = self[root+"/REFLECTANCE_ADD_BAND_%s" % self.get_band_number(band)]
+        mult = self[root+"/REFLECTANCE_MULT_BAND_%s" % self.get_band_number(band)]
 
         root = "LANDSAT_METADATA_FILE/IMAGE_ATTRIBUTES"
 
@@ -322,11 +313,10 @@ class Landsat7Metadata(LandsatMetadata):
 
     def get_radiance_correction(self,band):
         # return (add,mult)
-        l7_band = band_mapping.get(band, "")
 
         root = "LANDSAT_METADATA_FILE/LEVEL1_RADIOMETRIC_RESCALING"
-        add = self[root+"/RADIANCE_ADD_BAND_%s" % l7_band]
-        mult = self[root+"/RADIANCE_MULT_BAND_%s" % l7_band]
+        add = self[root+"/RADIANCE_ADD_BAND_%s" % self.get_band_number(band)]
+        mult = self[root+"/RADIANCE_MULT_BAND_%s" % self.get_band_number(band)]
 
         if add is None or mult is None:
             raise Exception("get_radiance_correction")
@@ -335,12 +325,11 @@ class Landsat7Metadata(LandsatMetadata):
 
     def get_bt_correction(self,band):
         # return (k1,k2)
-        l7_band = band_mapping.get(band, "")
 
         root = "LANDSAT_METADATA_FILE/LEVEL1_THERMAL_CONSTANTS"
 
-        k1 = self[root+"/K1_CONSTANT_BAND_%s" % l7_band]
-        k2 = self[root+"/K2_CONSTANT_BAND_%s" % l7_band]
+        k1 = self[root+"/K1_CONSTANT_BAND_%s" % self.get_band_number(band)]
+        k2 = self[root+"/K2_CONSTANT_BAND_%s" % self.get_band_number(band)]
         if k1 is None or k2 is None:
             raise Exception("get_bt_correction")
         else:

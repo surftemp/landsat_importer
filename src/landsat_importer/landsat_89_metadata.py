@@ -28,19 +28,18 @@ import logging
 
 
 suffixes_l1 = {
-    "1" : "B1.TIF",
-    "2" : "B2.TIF",
-    "3" : "B3.TIF",
-    "4" : "B4.TIF",
-    "5" : "B5.TIF",
-    "6" : "B6.TIF",
-    "7" : "B7.TIF",
-    "8" : "B8.TIF",
-    "9" : "B9.TIF",
-    "10" : "B10.TIF",
-    "11" : "B11.TIF",
+    "B1" : "B1.TIF",
+    "B2" : "B2.TIF",
+    "B3" : "B3.TIF",
+    "B4" : "B4.TIF",
+    "B5" : "B5.TIF",
+    "B6" : "B6.TIF",
+    "B7" : "B7.TIF",
+    "B8" : "B8.TIF",
+    "B9" : "B9.TIF",
+    "B10" : "B10.TIF",
+    "B11" : "B11.TIF",
     "QA" : "BQA.TIF",
-    "MTL" : "MTL.txt",
     "QA_PIXEL": "QA_PIXEL.TIF",
     "VAA": "VAA.TIF",
     "VZA": "VZA.TIF",
@@ -49,13 +48,13 @@ suffixes_l1 = {
 }
 
 suffixes_l2 = {
-    "1" : "SR_B1.TIF",
-    "2" : "SR_B2.TIF",
-    "3" : "SR_B3.TIF",
-    "4" : "SR_B4.TIF",
-    "5" : "SR_B5.TIF",
-    "6" : "SR_B6.TIF",
-    "7" : "SR_B7.TIF",
+    "B1" : "SR_B1.TIF",
+    "B2" : "SR_B2.TIF",
+    "B3" : "SR_B3.TIF",
+    "B4" : "SR_B4.TIF",
+    "B5" : "SR_B5.TIF",
+    "B6" : "SR_B6.TIF",
+    "B7" : "SR_B7.TIF",
     "ST": "ST_B10.TIF",
     "ST_QA": "ST_QA.TIF",
     "EMIS": "ST_EMIS.TIF",
@@ -212,8 +211,7 @@ class Landsat89Metadata(LandsatMetadata):
         self.units = {} # partial mapping from input band name to the units of the output variable
 
         if self.processing_level == "L2SP":
-            numeric_bands = ["1", "2", "3", "4", "5", "6", "7"]
-            self.available_bands += numeric_bands
+            self.available_bands = ["B1", "B2", "B3", "B4", "B5", "B6", "B7"]
             self.available_bands += ["ST", "ST_QA", "EMIS", "EMSD", "TRAD", "URAD", "DRAD", "ATRAN",
                                     "QA_PIXEL", "QA_AEROSOL", "QA_RADSAT"]
             self.units["ST"] = "K"
@@ -225,8 +223,7 @@ class Landsat89Metadata(LandsatMetadata):
             self.standard_names["ST"] = "surface_temperature"
 
         else:
-            numeric_bands = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]
-            self.available_bands += numeric_bands
+            self.available_bands = ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B11"]
             self.available_bands.append(self.get_qa_band())
 
             angle_bands = ["VAA","VZA","SAA","SZA"]
@@ -263,10 +260,6 @@ class Landsat89Metadata(LandsatMetadata):
             self.long_names[self.get_qa_band()] = 'QA Band'
             self.standard_names[self.get_qa_band()] = 'quality_flag'
 
-        # for input bands identified by a number, prepend "B" to provide the output name
-        for numeric_band in numeric_bands:
-            self.names[numeric_band] = "B" + numeric_band
-
         for band in oli_bands:
             self.units[band] = oli_units
             if oli_standard_name:
@@ -274,7 +267,17 @@ class Landsat89Metadata(LandsatMetadata):
             if oli_comment:
                 self.comments[band] = oli_comment
 
+    def is_bt(self, band):
+        return band in ["B10", "B11"]
 
+    def is_radiance(self, band):
+        return band in ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9"] and self.oli_format is OLIFormats.RADIANCE
+
+    def is_reflectance(self, band):
+        return band in ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9"] and self.oli_format is OLIFormats.REFLECTANCE
+
+    def is_corrected_reflectance(self, band):
+        return band in ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9"] and self.oli_format is OLIFormats.CORRECTED_REFLECTANCE
 
     def get_solar_angles(self):
         root = "LANDSAT_METADATA_FILE/IMAGE_ATTRIBUTES"
@@ -286,8 +289,8 @@ class Landsat89Metadata(LandsatMetadata):
 
     def get_reflectance_correction(self,band):
         # return (add,mult,sun_elevation)
-        add = self[f'LANDSAT_METADATA_FILE/LEVEL1_RADIOMETRIC_RESCALING/REFLECTANCE_ADD_BAND_{band}']
-        mult = self[f'LANDSAT_METADATA_FILE/LEVEL1_RADIOMETRIC_RESCALING/REFLECTANCE_MULT_BAND_{band}']
+        add = self[f'LANDSAT_METADATA_FILE/LEVEL1_RADIOMETRIC_RESCALING/REFLECTANCE_ADD_BAND_{self.get_band_number(band)}']
+        mult = self[f'LANDSAT_METADATA_FILE/LEVEL1_RADIOMETRIC_RESCALING/REFLECTANCE_MULT_BAND_{self.get_band_number(band)}']
         sun_elevation = self['LANDSAT_METADATA_FILE/IMAGE_ATTRIBUTES/SUN_ELEVATION']
 
         if add is None or mult is None:
@@ -303,8 +306,8 @@ class Landsat89Metadata(LandsatMetadata):
     def get_radiance_correction(self,band):
         # return (add,mult)
         root = "LANDSAT_METADATA_FILE/LEVEL1_RADIOMETRIC_RESCALING"
-        add = self[root+"/RADIANCE_ADD_BAND_%s" % band]
-        mult = self[root+"/RADIANCE_MULT_BAND_%s" % band]
+        add = self[root+"/RADIANCE_ADD_BAND_%s" % self.get_band_number(band)]
+        mult = self[root+"/RADIANCE_MULT_BAND_%s" % self.get_band_number(band)]
 
         if add is None or mult is None:
             raise Exception("get_radiance_correction")
@@ -314,8 +317,8 @@ class Landsat89Metadata(LandsatMetadata):
     def get_bt_correction(self,band):
         # return (k1,k2)
         root = "LANDSAT_METADATA_FILE/LEVEL1_THERMAL_CONSTANTS"
-        k1 = self[root+"/K1_CONSTANT_BAND_%s" % band]
-        k2 = self[root+"/K2_CONSTANT_BAND_%s" % band]
+        k1 = self[root+"/K1_CONSTANT_BAND_%s" % self.get_band_number(band)]
+        k2 = self[root+"/K2_CONSTANT_BAND_%s" % self.get_band_number(band)]
         if k1 is None or k2 is None:
             raise Exception("get_bt_correction")
         else:

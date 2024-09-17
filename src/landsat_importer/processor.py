@@ -67,7 +67,7 @@ class Processor:
 
         # load up metadata for this scene
         self.landsat_metadata = LandsatMetadataFactory.create_metadata(input_path, oli_format=oli_format)
-        self.logger.info(json.dumps(self.landsat_metadata.metadata, indent=4))
+        # self.logger.info(json.dumps(self.landsat_metadata.metadata, indent=4))
 
         # find the paths associated with the various bands that could exist in this scene
         # note that the input folder may not contain all the expected files
@@ -97,7 +97,7 @@ class Processor:
         Process a set of bands from the scene
 
         Args:
-            target_bands: a list of requested bands, for example ["3","4","5","11","QA"]
+            target_bands: a list of requested bands, for example ["B3","B4","B5","B11","QA"]
             output_path: path for the exported netcdf4 file
 
         Returns:
@@ -105,10 +105,7 @@ class Processor:
         """
         start_time = time.time()
         self.logger.info("landsat_importer version %s" % (VERSION))
-        self.target_bands = target_bands
-
-        if len(self.target_bands) == 0:
-            self.target_bands = self.landsat_metadata.get_bands()
+        self.target_bands = target_bands if target_bands else self.landsat_metadata.get_bands()
 
         # get lon/lat min/max from scene metadata
 
