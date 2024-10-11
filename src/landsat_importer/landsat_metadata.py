@@ -58,11 +58,8 @@ class LandsatMetadata:
     def is_integer(self, band):
         return band in ["QA", "QA_PIXEL", "QA_AEROSOL", "QA_RADSAT"]
 
-    def is_angle(self, band):
+    def is_level1_angle(self, band):
         return band in ["SAA", "SZA", "VAA", "VZA"]
-
-    def is_level2(self, band):
-        return band in ["ST", "ST_QA", "EMIS", "EMSD", "TRAD", "URAD", "DRAD", "ATRAN"]
 
     def __getitem__(self, keys):
         """
@@ -104,5 +101,18 @@ class LandsatMetadata:
     def __contains__(self, key):
         if self[key]:
             return True
+
+    def get_extent(self, is_lat):
+        # order "UL", "UR", "LL", "LR"
+        root = "LANDSAT_METADATA_FILE/PROJECTION_ATTRIBUTES"
+        lat_or_lon = "LAT" if is_lat else "LON"
+        ul = self[root + "/CORNER_UL_%s_PRODUCT" % lat_or_lon]
+        ur = self[root + "/CORNER_UR_%s_PRODUCT" % lat_or_lon]
+        ll = self[root + "/CORNER_LL_%s_PRODUCT" % lat_or_lon]
+        lr = self[root + "/CORNER_LR_%s_PRODUCT" % lat_or_lon]
+        if ul is None or ur is None or ll is None or lr is None:
+            raise Exception("get_lat_extent")
+        return [float(ul), float(ur), float(ll), float(lr)]
+
 
 

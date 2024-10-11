@@ -43,7 +43,6 @@ suffixes_l1 = {
     "B6_1" : "B6_VCID_1.TIF",
     "B6_2" : "B6_VCID_2.TIF",
     "B7" : "B7.TIF",
-    "B8" : "B8.TIF",
     "MTL" : "MTL.txt",
     "QA_PIXEL": "QA_PIXEL.TIF",
     "VAA": "VAA.TIF",
@@ -59,6 +58,7 @@ suffixes_l2 = {
     "B4" : "SR_B4.TIF",
     "B5" : "SR_B5.TIF",
     "ST": "ST_B6.TIF",
+    "B7": "SR_B7.TIF",
     "ST_QA": "ST_QA.TIF",
     "EMIS": "ST_EMIS.TIF",
     "EMSD": "ST_EMSD.TIF",
@@ -67,7 +67,6 @@ suffixes_l2 = {
     "DRAD": "ST_DRAD.TIF",
     "ATRAN": "ST_ATRAN.TIF",
     "QA_PIXEL": "QA_PIXEL.TIF",
-    "QA_AEROSOL": "",
     "QA_RADSAT": "QA_RADSAT.TIF",
     "MTL" : "MTL.txt"
 }
@@ -120,7 +119,6 @@ class Landsat7Metadata(LandsatMetadata):
         (49152, 49152, "unused"),
     ]
 
-
     def __init__(self, metadata, path, oli_format):
         """
         Landsat7Metadata takes care of some of the complexity of the landsat data products
@@ -153,19 +151,21 @@ class Landsat7Metadata(LandsatMetadata):
         self.scene_id = self["LANDSAT_METADATA_FILE/LEVEL1_PROCESSING_RECORD/LANDSAT_SCENE_ID"]
         self.doi = self['LANDSAT_METADATA_FILE/PRODUCT_CONTENTS/DIGITAL_OBJECT_IDENTIFIER']
 
-        # FIXME
         self.title = f'{self.spacecraft_id} {self.processing_level} data'
         self.summary = ''
 
         self.acknowledgement = self['LANDSAT_METADATA_FILE/PRODUCT_CONTENTS/ORIGIN']
         self.software_l1 = self['LANDSAT_METADATA_FILE/LEVEL1_PROCESSING_RECORD/PROCESSING_SOFTWARE_VERSION']
 
+        self.level = None  # the processing level, 1 or 2
+        self.oli_bands = []  # the names of supported optical bands
+
         if self.processing_level.startswith("L1"):
             self.level = 1
-            oli_bands = [str(b) for b in range(1,10)] # OLI bands are 1-9
+            self.oli_bands = ["B1", "B2", "B3", "B4", "B5", "B7"]
         elif self.processing_level.startswith("L2SP"):
             self.level = 2
-            oli_bands = [str(b) for b in range(1,8)] # OLI bands are 1-7
+            self.oli_bands = ["B1", "B2", "B3", "B4", "B5", "B7"]
         else:
             raise Exception("Unsupported processing level %s" % self.processing_level)
 
@@ -176,9 +176,12 @@ class Landsat7Metadata(LandsatMetadata):
                 self.landsat = nr
                 break
 
-        if self.landsat != 8 and self.landsat != 9 and self.landsat != 7:
+        if self.landsat != 7:
             raise Exception("No support for spacecraft_id=%s" % self.spacecraft_id)
 
+        oli_units = ""
+        oli_standard_name = ""
+        oli_comment = ""
         if self.level == 1:
             if self.oli_format is OLIFormats.RADIANCE:
                 oli_units = "W m-2 sr-1 um-1"
@@ -209,9 +212,9 @@ class Landsat7Metadata(LandsatMetadata):
         self.units = {} # partial mapping from input band name to the units of the output variable
 
         if self.processing_level == "L2SP":
-            self.available_bands = [ "B1", "B2", "B3", "B4", "B5"]
+            self.available_bands = [ "B1", "B2", "B3", "B4", "B5", "B7"]
             self.available_bands += ["ST", "ST_QA", "EMIS", "EMSD", "TRAD", "URAD", "DRAD", "ATRAN",
-                                    "QA_PIXEL", "QA_AEROSOL", "QA_RADSAT"]
+                                    "QA_PIXEL", "QA_RADSAT"]
             self.units["ST"] = "K"
             self.units["ST_QA"] = "K"
             self.units["TRAD"] = "W/(m2.sr.μm)/ DN"
@@ -221,7 +224,7 @@ class Landsat7Metadata(LandsatMetadata):
             self.standard_names["ST"] = "surface_temperature"
 
         else:
-            self.available_bands = ["B1", "B2", "B3", "B4", "B5", "B6_1", "B6_2", "B7", "B8"]
+            self.available_bands = ["B1", "B2", "B3", "B4", "B5", "B6_1", "B6_2", "B7"]
             self.available_bands.append(self.get_qa_band())
             angle_bands = ["VAA","VZA","SAA","SZA"]
             self.available_bands += angle_bands
@@ -250,12 +253,10 @@ class Landsat7Metadata(LandsatMetadata):
             self.units["B6_1"] = "K"
             self.units["B6_2"] = "K"
 
-            self.standard_names["10"] = "toa_brightness_temperature"
-            self.standard_names["11"] = "toa_brightness_temperature"
+            self.standard_names["B10"] = "toa_brightness_temperature"
+            self.standard_names["B11"] = "toa_brightness_temperature"
 
-
-
-        for band in oli_bands:
+        for band in self.oli_bands:
             self.units[band] = oli_units
             if oli_standard_name:
                 self.standard_names[band] = oli_standard_name
@@ -270,27 +271,21 @@ class Landsat7Metadata(LandsatMetadata):
         else:
             return super().get_band_number(band)
 
-    def is_bt(self, band):
+    # level 1 decoding
+
+    def is_level1_bt(self, band):
         return band in ["B6_1", "B6_2"]
 
-    def is_radiance(self, band):
-        return band in ["B1", "B2", "B3", "B4", "B5", "B7", "B8"] and self.oli_format is OLIFormats.RADIANCE
+    def is_level1_radiance(self, band):
+        return band in self.oli_bands and self.oli_format is OLIFormats.RADIANCE
 
-    def is_reflectance(self, band):
-        return band in ["B1", "B2", "B3", "B4", "B5", "B7", "B8"] and self.oli_format is OLIFormats.REFLECTANCE
+    def is_level1_reflectance(self, band):
+        return band in self.oli_bands and self.oli_format is OLIFormats.REFLECTANCE
 
-    def is_corrected_reflectance(self, band):
-        return band in ["B1", "B2", "B3", "B4", "B5", "B7", "B8"] and self.oli_format is OLIFormats.CORRECTED_REFLECTANCE
+    def is_level1_corrected_reflectance(self, band):
+        return band in self.oli_bands and self.oli_format is OLIFormats.CORRECTED_REFLECTANCE
 
-    def get_solar_angles(self):
-        root = "LANDSAT_METADATA_FILE/IMAGE_ATTRIBUTES"
-
-        elev = self[root+"/SUN_ELEVATION"]
-        azim = self[root+"/SUN_AZIMUTH"]
-        dist = self[root+"/EARTH_SUN_DISTANCE"]
-        return 90-float(elev), float(azim), float(dist)
-
-    def get_reflectance_correction(self,band):
+    def get_level1_reflectance_correction(self,band):
         # return (add,mult,sun_elevation)
 
         root = "LANDSAT_METADATA_FILE/LEVEL1_RADIOMETRIC_RESCALING"
@@ -306,12 +301,12 @@ class Landsat7Metadata(LandsatMetadata):
         else:
             return (float(add), float(mult), float(sun_elevation))
 
-    def get_angle_correction(self):
+    def get_level1_angle_correction(self):
         # return multiplying factor to convert angle band data to degrees
         # angles are encoded as hundredths of a degree
         return 0.01
 
-    def get_radiance_correction(self,band):
+    def get_level1_radiance_correction(self,band):
         # return (add,mult)
 
         root = "LANDSAT_METADATA_FILE/LEVEL1_RADIOMETRIC_RESCALING"
@@ -323,7 +318,7 @@ class Landsat7Metadata(LandsatMetadata):
         else:
             return (float(add),float(mult))
 
-    def get_bt_correction(self,band):
+    def get_level1_bt_correction(self,band):
         # return (k1,k2)
 
         root = "LANDSAT_METADATA_FILE/LEVEL1_THERMAL_CONSTANTS"
@@ -335,37 +330,21 @@ class Landsat7Metadata(LandsatMetadata):
         else:
             return (float(k1),float(k2))
 
-    def get_thermal_lines_samples(self):
-        root = "LANDSAT_METADATA_FILE/PROJECTION_ATTRIBUTES"
-        thermal_lines = self[root + "/THERMAL_LINES"]
-        thermal_samples = self[root + "/THERMAL_SAMPLES"]
-        return (int(thermal_lines), int(thermal_samples))
-
-    def get_extent(self,is_lat):
-        # order "UL", "UR", "LL", "LR"
-        root = "LANDSAT_METADATA_FILE/PROJECTION_ATTRIBUTES"
-        lat_or_lon = "LAT" if is_lat else "LON"
-        ul = self[root + "/CORNER_UL_%s_PRODUCT" % lat_or_lon]
-        ur = self[root + "/CORNER_UR_%s_PRODUCT" % lat_or_lon]
-        ll = self[root + "/CORNER_LL_%s_PRODUCT" % lat_or_lon]
-        lr = self[root + "/CORNER_LR_%s_PRODUCT" % lat_or_lon]
-        if ul is None or ur is None or ll is None or lr is None:
-            raise Exception("get_lat_extent")
-        return [float(ul),float(ur),float(ll),float(lr)]
-
     def get_level2_shift(self,band):
-        # https://www.usgs.gov/media/files/landsat-8-collection-2-level-2-science-product-guide
+        # https://www.usgs.gov/media/files/landsat-4-7-collection-2-level-2-science-product-guide
         if band == "ST":
-            root = "LANDSAT_METADATA_FILE/LEVEL2_SURFACE_TEMPERATURE_PARAMETERS"
-            return float(self[root+"/TEMPERATURE_ADD_BAND_ST_B6"])  # 149
+            return 149
+        elif band in self.oli_bands:
+            return -0.2
         else:
             return 0
 
     def get_level2_scale(self,band):
-        # https://www.usgs.gov/media/files/landsat-8-collection-2-level-2-science-product-guide
+        # https://www.usgs.gov/media/files/landsat-4-7-collection-2-level-2-science-product-guide
         if band == "ST":
-            root = "LANDSAT_METADATA_FILE/LEVEL2_SURFACE_TEMPERATURE_PARAMETERS"
-            return float(self[root + "/TEMPERATURE_MULT_BAND_ST_B6"])  # 0.00341802
+            return 0.00341802
+        elif band in self.oli_bands:
+            return 0.0000275
         elif band == "ST_QA":
             return 0.01
         elif band in ["EMIS", "EMSD", "ATRAN"]:
@@ -376,19 +355,13 @@ class Landsat7Metadata(LandsatMetadata):
             return 1
 
     def get_level2_fillvalue(self,band):
-        # https://www.usgs.gov/media/files/landsat-8-collection-2-level-2-science-product-guide
+        # https://www.usgs.gov/media/files/landsat-4-7-collection-2-level-2-science-product-guide
         if band in ["ST_QA", "EMIS", "EMSD", "ATRAN", "TRAD", "URAD", "DRAD"]:
             return -9999
+        elif band in ["QA_PIXEL"]:
+            return 1
         else:
             return 0
-
-    def get_surface_temperature_correction(self):
-        root = "LANDSAT_METADATA_FILE/LEVEL2_SURFACE_TEMPERATURE_PARAMETERS"
-        mult = self[root+"/TEMPERATURE_MULT_BAND_ST_B6"] # 0.00341802
-        add = self[root+"/TEMPERATURE_ADD_BAND_ST_B6"] # 149.0
-        if mult is None or add is None:
-            raise Exception("get_surface_temperature_correction")
-        return [float(add),float(mult)]
 
     def get_sensor_id(self):
         return self.sensor_id
@@ -434,34 +407,6 @@ class Landsat7Metadata(LandsatMetadata):
 
     def get_collection(self):
         return self.collection
-
-    def get_pixel_filter(self, cloud_filter, cloud_shadow_filter, cirrus_filter=None):
-
-        if not cloud_filter and not cloud_shadow_filter:
-            return None
-
-        def get_threshold(filter):
-            if filter == "medium":
-                return 2
-            elif filter == "high":
-                return 3
-            else:
-                return 4 # allow all values through
-
-        cloud_threshold = get_threshold(cloud_filter)
-        cloud_shadow_threshold = get_threshold(cloud_shadow_filter)
-
-        cloud_confidence = get_cloud_confidence()
-        cloud_shadow_confidence = get_cloud_shadow_confidence()
-
-        def filter_function(q):
-            if cloud_confidence(q) >= cloud_threshold:
-                return False
-            if cloud_shadow_confidence(q) >= cloud_shadow_threshold:
-                return False
-            return True
-
-        return filter_function
 
     def get_qa_band(self):
         return "QA_PIXEL"

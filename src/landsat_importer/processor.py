@@ -46,8 +46,6 @@ class Processor:
     # the number of m per degree of latitude
     M_PER_DEGREE_LATLON = 111111
 
-
-
     def __init__(self, input_path,
                  oli_format=OLIFormats.CORRECTED_REFLECTANCE):
         """
@@ -171,38 +169,39 @@ class Processor:
 
     def preprocess_band(self,landsat_metadata, band, data):
         """
-        preprocess a particular band to extract pixel values from the landsat encoding
+        preprocess a particular band to decode pixel values from the landsat encoding
 
         Args:
             landsat_metadata: a LandsatMetadata object
             band: the name of the band
-            data: a numpy array containing the band's data imported from the landsat scene
+            data: an xarray DataArray containing the band's data imported from the landsat scene
 
         Returns:
-
+            a numpy data array containing the decoded values
         """
-        if landsat_metadata.is_level2(band):
+        if landsat_metadata.level == 2:
             add = landsat_metadata.get_level2_shift(band)
             mult = landsat_metadata.get_level2_scale(band)
-            return TiffImporter.decode(data, mult, add, None)
+            fillvalue = landsat_metadata.get_level2_fillvalue(band)
+            return TiffImporter.decode(data, mult, add, fillvalue)
         else:
-            if landsat_metadata.is_reflectance(band) or landsat_metadata.is_corrected_reflectance(band):
-                A_rho, M_rho, sun_elevation = landsat_metadata.get_reflectance_correction(band)
+            if landsat_metadata.is_level1_reflectance(band) or landsat_metadata.is_level1_corrected_reflectance(band):
+                A_rho, M_rho, sun_elevation = landsat_metadata.get_level1_reflectance_correction(band)
                 refl = TiffImporter.DN_to_refl(data, M_rho, A_rho)
-                if landsat_metadata.is_corrected_reflectance(band):
+                if landsat_metadata.is_level1_corrected_reflectance(band):
                     return TiffImporter.reflectance_corrected(refl, sun_elevation)
                 else:
                     return refl
-            elif landsat_metadata.is_bt(band) or landsat_metadata.is_radiance(band):
-                AL, ML = landsat_metadata.get_radiance_correction(band)
+            elif landsat_metadata.is_level1_bt(band) or landsat_metadata.is_level1_radiance(band):
+                AL, ML = landsat_metadata.get_level1_radiance_correction(band)
                 rad = TiffImporter.DN_to_radiance(data, ML, AL)
-                if landsat_metadata.is_bt(band):
-                    K1, K2 = landsat_metadata.get_bt_correction(band)
+                if landsat_metadata.is_level1_bt(band):
+                    K1, K2 = landsat_metadata.get_level1_bt_correction(band)
                     return TiffImporter.Radiance_to_satBT(rad, K1, K2)
                 else:
                     return rad
-            elif landsat_metadata.is_angle(band):
-                ML = landsat_metadata.get_angle_correction()
+            elif landsat_metadata.is_level1_angle(band):
+                ML = landsat_metadata.get_level1_angle_correction()
                 return TiffImporter.Angle_to_Degrees(data, ML)
             else:
                 # do nothing

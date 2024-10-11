@@ -30,6 +30,9 @@ Convert a single landsat scene, all bands
 run_landsat_importer <path_to_landsat_scene_metadata_file> <output_netcdf4_path>
 ```
 
+## Known issues
+
+https://www.usgs.gov/landsat-missions/landsat-collection-2-known-issues
 
 
 
