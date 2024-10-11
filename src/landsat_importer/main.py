@@ -52,7 +52,7 @@ def main():
     parser.add_argument("input_path",help="Specify the path to the input landsat scene, may be a folder or metadata filename")
     parser.add_argument("output_path", help="Specify the output folder or filename")
 
-    parser.add_argument("--bands", help="Provide a comma separated list of the bands to export", default="")
+    parser.add_argument("--bands", nargs="+", help="Provide a comma separated list of the bands to import")
 
     parser.add_argument("--inject-metadata", nargs="+", help="Inject global metadata from one or more key=value pairs", default=[])
 
@@ -139,7 +139,9 @@ def main():
 
         if slurm_options:
             script_contents = "conda activate rioxarray_env\n\n"
-            script_contents += f"run_landsat_importer {input_path} {output_path} --bands {args.bands}"
+            script_contents += f"run_landsat_importer {input_path} {output_path} "
+            if args.bands:
+                script_contents == "--bands {' '.join(args.bands)}"
             if args.min_lat:
                 script_contents += f" --min-lat {args.min_lat}"
                 script_contents += f" --max-lat {args.max_lat}"
@@ -160,8 +162,10 @@ def main():
                 p = Processor(input_path,
                               oli_format=args.export_oli_as)
                 target_bands = []
+                # collect the target bands.  For bands specified as numbers, add a B prefix
                 if args.bands:
-                    target_bands = list(map(lambda s:s.strip(),args.bands.split(",")))
+                    target_bands = args.bands[:]
+
                 if len(input_paths)>1 or not output_path.endswith(".nc"):
                     # looks like output_path should specify a directory so
                     # create if needed, and append the filename based on the specified pattern
@@ -177,6 +181,7 @@ def main():
                     for metadata in args.inject_metadata:
                         kv = metadata.split("=")
                         inject_metadata[kv[0]] = kv[1]
+
                 p.process(target_bands)
                 p.export(output_file_path, include_angles=args.include_angles, min_lat=args.min_lat, min_lon=args.min_lon,
                          max_lat=args.max_lat, max_lon=args.max_lon, inject_metadata=inject_metadata)

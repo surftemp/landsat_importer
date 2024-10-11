@@ -51,8 +51,6 @@ class TiffImporter:
         """
         da = rioxarray.open_rasterio(path).squeeze(drop=True)
         encoding = da.encoding
-        if band == "8":
-            da = da[::2, ::2]
 
         if '_FillValue' in da.attrs:
             da = da.where(da != da._FillValue)
@@ -154,7 +152,9 @@ class TiffImporter:
         Decode L2 surface_temperature etc
         """
         if FILL is not None:
-            return np.where(image_data == FILL, np.nan, (image_data * M) + A)
+            da = image_data.copy()
+            da.data = np.where(image_data == FILL, np.nan, (image_data * M) + A)
+            return da
         else:
             return (image_data * M) + A
 

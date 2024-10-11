@@ -44,32 +44,22 @@ class LandsatMetadata:
         for file in files:
             for band in bands:
                 suffix = band_suffixes[band]
-                if file.startswith(stem) and file.endswith(suffix):
-                    if band in band_paths:
-                        self.logger.warning("Found multiple TIF files with same suffix %s for band %s, ignoring %s"% (suffix,band,file))
+                if file == stem + "_" + suffix:
                     band_paths[band] = os.path.join(folder, file)
         return band_paths
 
-    def is_bt(self, band):
-        return band in ["10", "11"]
-
-    def is_radiance(self, band):
-        return band in ["1", "2", "3", "4", "5", "6", "7", "8", "9"] and self.oli_format is OLIFormats.RADIANCE
-
-    def is_reflectance(self, band):
-        return band in ["1", "2", "3", "4", "5", "6", "7", "8", "9"] and self.oli_format is OLIFormats.REFLECTANCE
-
-    def is_corrected_reflectance(self, band):
-        return band in ["1", "2", "3", "4", "5", "6", "7", "8", "9"] and self.oli_format is OLIFormats.CORRECTED_REFLECTANCE
+    def get_band_number(self, band):
+        if band.startswith("B"):
+            try:
+                return str(int(band[1:]))
+            except:
+                return None
 
     def is_integer(self, band):
         return band in ["QA", "QA_PIXEL", "QA_AEROSOL", "QA_RADSAT"]
 
-    def is_angle(self, band):
+    def is_level1_angle(self, band):
         return band in ["SAA", "SZA", "VAA", "VZA"]
-
-    def is_level2(self, band):
-        return band in ["ST", "ST_QA", "EMIS", "EMSD", "TRAD", "URAD", "DRAD", "ATRAN"]
 
     def __getitem__(self, keys):
         """
@@ -111,5 +101,18 @@ class LandsatMetadata:
     def __contains__(self, key):
         if self[key]:
             return True
+
+    def get_extent(self, is_lat):
+        # order "UL", "UR", "LL", "LR"
+        root = "LANDSAT_METADATA_FILE/PROJECTION_ATTRIBUTES"
+        lat_or_lon = "LAT" if is_lat else "LON"
+        ul = self[root + "/CORNER_UL_%s_PRODUCT" % lat_or_lon]
+        ur = self[root + "/CORNER_UR_%s_PRODUCT" % lat_or_lon]
+        ll = self[root + "/CORNER_LL_%s_PRODUCT" % lat_or_lon]
+        lr = self[root + "/CORNER_LR_%s_PRODUCT" % lat_or_lon]
+        if ul is None or ur is None or ll is None or lr is None:
+            raise Exception("get_lat_extent")
+        return [float(ul), float(ur), float(ll), float(lr)]
+
 
 
