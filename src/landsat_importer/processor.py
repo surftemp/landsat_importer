@@ -21,7 +21,7 @@ import enum
 
 import xarray
 
-from .oli_formats import OLIFormats
+from .optical_formats import OpticalFormats
 from .landsat_metadata_factory import LandsatMetadataFactory
 
 from landsat_importer import VERSION
@@ -47,24 +47,24 @@ class Processor:
     M_PER_DEGREE_LATLON = 111111
 
     def __init__(self, input_path,
-                 oli_format=OLIFormats.CORRECTED_REFLECTANCE):
+                 optical_format=OpticalFormats.CORRECTED_REFLECTANCE):
         """
         Construct a Processor
 
         Args:
             input_folder: the folder containing the input scene
-            oli_format: specify how to export the OLI bands, should be an OLIFormats enum value
+            optical_format: specify how to export the OLI bands, should be an OLIFormats enum value
         """
         self.input_path = input_path
         self.logger = logging.getLogger("Processor")
 
         self.importer = TiffImporter()
-        self.oli_format = oli_format
+        self.optical_format = optical_format
 
         self.target_bands = []
 
         # load up metadata for this scene
-        self.landsat_metadata = LandsatMetadataFactory.create_metadata(input_path, oli_format=oli_format)
+        self.landsat_metadata = LandsatMetadataFactory.create_metadata(input_path, optical_format=optical_format)
         # self.logger.info(json.dumps(self.landsat_metadata.metadata, indent=4))
 
         # find the paths associated with the various bands that could exist in this scene
@@ -107,8 +107,8 @@ class Processor:
 
         # get lon/lat min/max from scene metadata
 
-        lats = self.landsat_metadata.get_extent(is_lat=True)
-        lons = self.landsat_metadata.get_extent(is_lat=False)
+        lats = self.landsat_metadata.get_extent("lat")
+        lons = self.landsat_metadata.get_extent("lon")
 
         # work out the bounding box
         self.min_lon = min(lons)

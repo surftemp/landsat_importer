@@ -1,12 +1,43 @@
 import os
-from .oli_formats import OLIFormats
+from .optical_formats import OpticalFormats
 
 class LandsatMetadata:
 
-    def __init__(self, metadata, path, oli_format):
+    def __init__(self, metadata, path, optical_format):
         self.metadata = metadata
         self.path = path
-        self.oli_format = oli_format
+        self.optical_format = optical_format
+
+    def set_optical_metadata(self):
+        self.optical_units = ""
+        self.optical_standard_name = ""
+        self.optical_comment = ""
+        if self.level == 1:
+            if self.optical_format is OpticalFormats.RADIANCE:
+                self.optical_units = "W m-2 sr-1 um-1"
+                self.optical_standard_name = "toa_outgoing_radiance_per_unit_wavelength"
+                self.optical_comment = None
+            elif self.optical_format is OpticalFormats.CORRECTED_REFLECTANCE:
+                self.optical_units = "1"
+                self.optical_standard_name = "toa_bidirectional_reflectance"
+                self.optical_comment = None
+            elif self.optical_format is OpticalFormats.REFLECTANCE:
+                self.optical_units = "1"
+                self.optical_standard_name = None
+                self.optical_comment = "TOA reflectance without factor for solar zenith angle"
+            else:
+                raise Exception("Unsupported OLI output format %s" % str(self.optical_format))
+        elif self.level == 2:
+            self.optical_units = "1"
+            self.optical_standard_name = "surface_bidirectional_reflectance"
+            self.optical_comment = None
+
+        for band in self.optical_bands:
+            self.units[band] = self.optical_units
+            if self.optical_standard_name:
+                self.standard_names[band] = self.optical_standard_name
+            if self.optical_comment:
+                self.comments[band] = self.optical_comment
 
     def get_id(self):
         return f"LANDSAT_SCENE_ID={self.scene_id} LANDSAT_PRODUCT_ID={self.product_id}"
@@ -102,14 +133,15 @@ class LandsatMetadata:
         if self[key]:
             return True
 
-    def get_extent(self, is_lat):
+    def get_extent(self, latlon):
         # order "UL", "UR", "LL", "LR"
+        latlon = latlon.upper()
+        assert latlon in ['LAT', 'LON']
         root = "LANDSAT_METADATA_FILE/PROJECTION_ATTRIBUTES"
-        lat_or_lon = "LAT" if is_lat else "LON"
-        ul = self[root + "/CORNER_UL_%s_PRODUCT" % lat_or_lon]
-        ur = self[root + "/CORNER_UR_%s_PRODUCT" % lat_or_lon]
-        ll = self[root + "/CORNER_LL_%s_PRODUCT" % lat_or_lon]
-        lr = self[root + "/CORNER_LR_%s_PRODUCT" % lat_or_lon]
+        ul = self[root + f"/CORNER_UL_{latlon}_PRODUCT"]
+        ur = self[root + f"/CORNER_UR_{latlon}_PRODUCT"]
+        ll = self[root + f"/CORNER_LL_{latlon}_PRODUCT"]
+        lr = self[root + f"/CORNER_LR_{latlon}_PRODUCT"]
         if ul is None or ur is None or ll is None or lr is None:
             raise Exception("get_lat_extent")
         return [float(ul), float(ur), float(ll), float(lr)]

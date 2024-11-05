@@ -22,7 +22,7 @@ Support for parsing landsat8 text formatted metadata (_MTL.txt) files
 
 import datetime
 from pytz import UTC
-from .oli_formats import OLIFormats
+from .optical_formats import OpticalFormats
 from .landsat_metadata import LandsatMetadata
 import logging
 
@@ -77,16 +77,7 @@ def get_cloud_confidence():
 def get_cloud_shadow_confidence():
     return lambda q: (q >> 10) & 3
 
-product_info = {
-    'https://doi.org/10.5066/P975CC9B': {
-        'title': 'Landsat 8-9 Operational Land Imager and Thermal Infrared Sensor Collection 2 Level-1 Data',
-        'summary': 'Landsat 8-9 Operational Land Imager (OLI) and Thermal Infrared Sensor (TIRS) Collection 2 Level-1 15- to 30-meter multispectral data.',
-        },
-    'https://doi.org/10.5066/P9OGBGM6': {
-        'title': 'Landsat 8-9 OLI/TIRS Collection 2 Level-2 Science Products',
-        'summary': 'Landsat 8-9 Operational Land Imager (OLI) and Thermal Infrared (TIRS) Collection 2 Level-2 Science Products 30-meter multispectral data.',
-        }
-    }
+
 
 class Landsat7Metadata(LandsatMetadata):
     # https://www.usgs.gov/media/files/landsat-8-data-users-handbook P55
@@ -119,16 +110,16 @@ class Landsat7Metadata(LandsatMetadata):
         (49152, 49152, "unused"),
     ]
 
-    def __init__(self, metadata, path, oli_format):
+    def __init__(self, metadata, path, optical_format):
         """
         Landsat7Metadata takes care of some of the complexity of the landsat data products
 
         Args:
             metadata: dictionary containing landsat metadata
             path: path of the xml file that produced the metadata
-            oli_format: the output format to use for OLI bands
+            optical_format: the output format to use for OLI bands
         """
-        super().__init__(metadata, path, oli_format)
+        super().__init__(metadata, path, optical_format)
         self.logger = logging.getLogger("landsat7_metadata")
 
         self.landsat = 0
@@ -151,21 +142,22 @@ class Landsat7Metadata(LandsatMetadata):
         self.scene_id = self["LANDSAT_METADATA_FILE/LEVEL1_PROCESSING_RECORD/LANDSAT_SCENE_ID"]
         self.doi = self['LANDSAT_METADATA_FILE/PRODUCT_CONTENTS/DIGITAL_OBJECT_IDENTIFIER']
 
-        self.title = f'{self.spacecraft_id} {self.processing_level} data'
-        self.summary = ''
-
         self.acknowledgement = self['LANDSAT_METADATA_FILE/PRODUCT_CONTENTS/ORIGIN']
         self.software_l1 = self['LANDSAT_METADATA_FILE/LEVEL1_PROCESSING_RECORD/PROCESSING_SOFTWARE_VERSION']
 
         self.level = None  # the processing level, 1 or 2
-        self.oli_bands = []  # the names of supported optical bands
+        self.optical_bands = []  # the names of supported optical bands
 
         if self.processing_level.startswith("L1"):
             self.level = 1
-            self.oli_bands = ["B1", "B2", "B3", "B4", "B5", "B7"]
+            self.optical_bands = ["B1", "B2", "B3", "B4", "B5", "B7"]
+            self.title = "Landsat 7 Enhanced Thematic Mapper Plus (ETM+) Level-1 Data Products"
+            self.summary = "Earth Resources Observation and Science (EROS) Center. (2017). Landsat 7 Enhanced Thematic Mapper Plus Level-1, Collection 1 [dataset]. U.S. Geological Survey. https://doi.org/10.5066/F7WH2P8G"
         elif self.processing_level.startswith("L2SP"):
             self.level = 2
-            self.oli_bands = ["B1", "B2", "B3", "B4", "B5", "B7"]
+            self.optical_bands = ["B1", "B2", "B3", "B4", "B5", "B7"]
+            self.title = "Landsat 7 ETM Plus Collection 2 Level-2 Science Products"
+            self.summary = "Earth Resources Observation and Science (EROS) Center. (2020). Landsat 7 Enhanced Thematic Mapper Plus Level-2, Collection 2 [dataset]. U.S. Geological Survey. https://doi.org/10.5066/P9C7I13B"
         else:
             raise Exception("Unsupported processing level %s" % self.processing_level)
 
@@ -179,28 +171,7 @@ class Landsat7Metadata(LandsatMetadata):
         if self.landsat != 7:
             raise Exception("No support for spacecraft_id=%s" % self.spacecraft_id)
 
-        oli_units = ""
-        oli_standard_name = ""
-        oli_comment = ""
-        if self.level == 1:
-            if self.oli_format is OLIFormats.RADIANCE:
-                oli_units = "W m-2 sr-1 um-1"
-                oli_standard_name = "toa_outgoing_radiance_per_unit_wavelength"
-                oli_comment = None
-            elif self.oli_format is OLIFormats.CORRECTED_REFLECTANCE:
-                oli_units = "1"
-                oli_standard_name = "toa_bidirectional_reflectance"
-                oli_comment = None
-            elif self.oli_format is OLIFormats.REFLECTANCE:
-                oli_units = "1"
-                oli_standard_name = None
-                oli_comment = "TOA reflectance without factor for solar zenith angle"
-            else:
-                raise Exception("Unsupported OLI output format %s" % str(self.oli_format))
-        elif self.level == 2:
-            oli_units = "1"
-            oli_standard_name = "surface_bidirectional_reflectance"
-            oli_comment = None
+
 
         # fill out the following metadata that describes the input bands and their mapping to output CF-compliant metadata
 
@@ -256,12 +227,8 @@ class Landsat7Metadata(LandsatMetadata):
             self.standard_names["B10"] = "toa_brightness_temperature"
             self.standard_names["B11"] = "toa_brightness_temperature"
 
-        for band in self.oli_bands:
-            self.units[band] = oli_units
-            if oli_standard_name:
-                self.standard_names[band] = oli_standard_name
-            if oli_comment:
-                self.comments[band] = oli_comment
+        super().set_optical_metadata()
+
 
     def get_band_number(self, band):
         if band == "B6_1":
@@ -277,13 +244,13 @@ class Landsat7Metadata(LandsatMetadata):
         return band in ["B6_1", "B6_2"]
 
     def is_level1_radiance(self, band):
-        return band in self.oli_bands and self.oli_format is OLIFormats.RADIANCE
+        return band in self.optical_bands and self.optical_format is OpticalFormats.RADIANCE
 
     def is_level1_reflectance(self, band):
-        return band in self.oli_bands and self.oli_format is OLIFormats.REFLECTANCE
+        return band in self.optical_bands and self.optical_format is OpticalFormats.REFLECTANCE
 
     def is_level1_corrected_reflectance(self, band):
-        return band in self.oli_bands and self.oli_format is OLIFormats.CORRECTED_REFLECTANCE
+        return band in self.optical_bands and self.optical_format is OpticalFormats.CORRECTED_REFLECTANCE
 
     def get_level1_reflectance_correction(self,band):
         # return (add,mult,sun_elevation)
@@ -334,7 +301,7 @@ class Landsat7Metadata(LandsatMetadata):
         # https://www.usgs.gov/media/files/landsat-4-7-collection-2-level-2-science-product-guide
         if band == "ST":
             return 149
-        elif band in self.oli_bands:
+        elif band in self.optical_bands:
             return -0.2
         else:
             return 0
@@ -343,7 +310,7 @@ class Landsat7Metadata(LandsatMetadata):
         # https://www.usgs.gov/media/files/landsat-4-7-collection-2-level-2-science-product-guide
         if band == "ST":
             return 0.00341802
-        elif band in self.oli_bands:
+        elif band in self.optical_bands:
             return 0.0000275
         elif band == "ST_QA":
             return 0.01

@@ -158,8 +158,3 @@ class TiffImporter:
         else:
             return (image_data * M) + A
 
-if __name__ == '__main__':
-    ti = TiffImporter()
-    r = ti.latlon_image("/home/dev/github/landsat2nc/EE/LANDSAT_8_C1/LC80080132019127LGN00/LC08_L1TP_008013_20190507_20190521_01_T1_B4.TIF")
-    print(r)
-    r.to_netcdf("nc.nc")
