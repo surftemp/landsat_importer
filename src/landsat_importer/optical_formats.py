@@ -18,7 +18,7 @@
 
 from enum import Enum
 
-class OLIFormats(Enum):
+class OpticalFormats(Enum):
     """Define the potenital processing options for OLI"""
 
     REFLECTANCE = "reflectance"

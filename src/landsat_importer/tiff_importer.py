@@ -51,8 +51,6 @@ class TiffImporter:
         """
         da = rioxarray.open_rasterio(path).squeeze(drop=True)
         encoding = da.encoding
-        if band == "8":
-            da = da[::2, ::2]
 
         if '_FillValue' in da.attrs:
             da = da.where(da != da._FillValue)
@@ -154,12 +152,9 @@ class TiffImporter:
         Decode L2 surface_temperature etc
         """
         if FILL is not None:
-            return np.where(image_data == FILL, np.nan, (image_data * M) + A)
+            da = image_data.copy()
+            da.data = np.where(image_data == FILL, np.nan, (image_data * M) + A)
+            return da
         else:
             return (image_data * M) + A
 
-if __name__ == '__main__':
-    ti = TiffImporter()
-    r = ti.latlon_image("/home/dev/github/landsat2nc/EE/LANDSAT_8_C1/LC80080132019127LGN00/LC08_L1TP_008013_20190507_20190521_01_T1_B4.TIF")
-    print(r)
-    r.to_netcdf("nc.nc")

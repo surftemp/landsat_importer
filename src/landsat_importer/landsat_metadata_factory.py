@@ -9,13 +9,13 @@ from landsat_importer.landsat_89_metadata import Landsat89Metadata
 class LandsatMetadataFactory:
 
     @staticmethod
-    def create_metadata(scene_path, oli_format):
+    def create_metadata(scene_path, optical_format):
         """
         LandsatMetadataFactory takes care of some of the complexity of the landsat data products
 
         Args:
             scene_path: path to a landsat scene (folder, or metadata file)
-            oli_format: the output format to use for OLI bands
+            optical_format: the output format to use for optical bands
         """
         path = None
         if os.path.isdir(scene_path):
@@ -42,9 +42,9 @@ class LandsatMetadataFactory:
 
         spacecraft_id = metadata.get("LANDSAT_METADATA_FILE", {}).get("IMAGE_ATTRIBUTES", {}).get("SPACECRAFT_ID", "")
         if spacecraft_id == "LANDSAT_7":
-            return Landsat7Metadata(metadata, path, oli_format=oli_format)
+            return Landsat7Metadata(metadata, path, optical_format=optical_format)
         else:
-            return Landsat89Metadata(metadata, path, oli_format=oli_format)
+            return Landsat89Metadata(metadata, path, optical_format=optical_format)
 
     @staticmethod
     def read_metadata_xml(path):

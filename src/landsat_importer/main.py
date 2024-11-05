@@ -17,26 +17,7 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import logging
-import random
 import json
-
-available = False
-try:
-    from pyjob import use
-    use("slurm")
-
-    import pyjob
-    available = True
-except:
-    pass
-
-slurm_defaults = {
-    'runtime': '04:00',
-    'memlimit': '4192',
-    'queue': 'short-serial',
-    'name': 'landsat_importer'
-}
-
 
 def main():
 
@@ -45,23 +26,23 @@ def main():
 
     import argparse
     import os.path
-    from .oli_formats import OLIFormats
+    from .optical_formats import OpticalFormats
 
     parser = argparse.ArgumentParser()
 
     parser.add_argument("input_path",help="Specify the path to the input landsat scene, may be a folder or metadata filename")
     parser.add_argument("output_path", help="Specify the output folder or filename")
 
-    parser.add_argument("--bands", help="Provide a comma separated list of the bands to export", default="")
+    parser.add_argument("--bands", nargs="+", help="Provide a list of the bands to import")
 
     parser.add_argument("--inject-metadata", nargs="+", help="Inject global metadata from one or more key=value pairs", default=[])
 
     parser.add_argument(
-        "--export_oli_as",
-        type=OLIFormats,
-        default=OLIFormats.CORRECTED_REFLECTANCE,
-        choices=list(OLIFormats),
-        help="L1 only: specify the output format for the OLI bands 1-9",
+        "--export_optical_as",
+        type=OpticalFormats,
+        default=OpticalFormats.CORRECTED_REFLECTANCE,
+        choices=list(OpticalFormats),
+        help="L1 only: specify the output format for the optical bands",
     )
 
     parser.add_argument(
@@ -81,19 +62,12 @@ def main():
     parser.add_argument("--max-lat", help="Max lat of bounding box to extract", type=float, default=None)
     parser.add_argument("--min-lon", help="Min lon of bounding box to extract", type=float, default=None)
     parser.add_argument("--max-lon", help="Max lon of bounding box to extract", type=float, default=None)
-    parser.add_argument("--use-slurm", action="store_true", help="do not run locally, instead launch slurm job(s)")
 
     parser.add_argument("--limit", type=int, help="process only this many scenes", default=None)
     parser.add_argument("--offset", type=int, help="start processing at this offset in the list", default=None)
     parser.add_argument("--batch", type=int, help="use this batch  size", default=None)
 
     args = parser.parse_args()
-
-    rng = random.Random(123)
-
-    slurm_options = None
-    if args.use_slurm:
-        slurm_options = {k: v for (k, v) in slurm_defaults.items()}
 
     from landsat_importer.processor import Processor
     input_paths = []
@@ -110,8 +84,6 @@ def main():
                 input_paths.append(os.path.join(args.input_path,filename))
     else:
         input_paths = [args.input_path]
-
-    rng.shuffle(input_paths)
 
     logger.info("Found %d scenes to process"%(len(input_paths)))
 
@@ -137,55 +109,40 @@ def main():
         idx += 1
         processed += 1
 
-        if slurm_options:
-            script_contents = "conda activate rioxarray_env\n\n"
-            script_contents += f"run_landsat_importer {input_path} {output_path} --bands {args.bands}"
-            if args.min_lat:
-                script_contents += f" --min-lat {args.min_lat}"
-                script_contents += f" --max-lat {args.max_lat}"
-                script_contents += f" --min-lon {args.min_lon}"
-                script_contents += f" --max-lon {args.max_lon}"
-            if args.include_angles:
-                script_contents += " --include-angles"
+        try:
+            p = Processor(input_path,
+                          optical_format=args.export_optical_as)
+            target_bands = []
+            # collect the target bands.  For bands specified as numbers, add a B prefix
+            if args.bands:
+                target_bands = args.bands[:]
+
+            if len(input_paths)>1 or not output_path.endswith(".nc"):
+                # looks like output_path should specify a directory so
+                # create if needed, and append the filename based on the specified pattern
+                os.makedirs(output_path,exist_ok=True)
+                output_file_path = os.path.join(output_path,p.get_output_filename(args.output_file_pattern))
+            else:
+                output_file_path = output_path
+            if os.path.exists(output_file_path):
+                logger.info(f"Output path {output_file_path} already exists, skipping")
+                continue
+            inject_metadata = {}
             if args.inject_metadata:
-                s = "".join(args.inject_metadata)
-                script_contents += f" --inject-metadata {s}"
-            script_contents += f" --export_oli_as {args.export_oli_as}"
-            script_contents += f" --output-file-pattern \"{args.output_file_pattern}\"\n"
-            job = pyjob.Job('hostname', script=script_contents, options=slurm_options, env="/bin/bash")
-            task_id = pyjob.cluster.submit(job)
-            logger.info(f"Launched task {task_id}")
-        else:
-            try:
-                p = Processor(input_path,
-                              oli_format=args.export_oli_as)
-                target_bands = []
-                if args.bands:
-                    target_bands = list(map(lambda s:s.strip(),args.bands.split(",")))
-                if len(input_paths)>1 or not output_path.endswith(".nc"):
-                    # looks like output_path should specify a directory so
-                    # create if needed, and append the filename based on the specified pattern
-                    os.makedirs(output_path,exist_ok=True)
-                    output_file_path = os.path.join(output_path,p.get_output_filename(args.output_file_pattern))
-                else:
-                    output_file_path = output_path
-                if os.path.exists(output_file_path):
-                    logger.info(f"Output path {output_file_path} already exists, skipping")
-                    continue
-                inject_metadata = {}
-                if args.inject_metadata:
-                    for metadata in args.inject_metadata:
-                        kv = metadata.split("=")
-                        inject_metadata[kv[0]] = kv[1]
-                p.process(target_bands)
-                p.export(output_file_path, include_angles=args.include_angles, min_lat=args.min_lat, min_lon=args.min_lon,
-                         max_lat=args.max_lat, max_lon=args.max_lon, inject_metadata=inject_metadata)
-            except Exception as ex:
-                logger.exception(f"Processing failed for {input_path}: "+str(ex))
-                if len(input_paths) == 1:
-                    # if only processing one scene, re-raise the exception and fail the execution
-                    # if processing multiple scenes, continue
-                    raise
+                for metadata in args.inject_metadata:
+                    kv = metadata.split("=")
+                    inject_metadata[kv[0]] = kv[1]
+
+            p.process(target_bands)
+            p.export(output_file_path, include_angles=args.include_angles, min_lat=args.min_lat, min_lon=args.min_lon,
+                     max_lat=args.max_lat, max_lon=args.max_lon, inject_metadata=inject_metadata)
+
+        except Exception as ex:
+            logger.exception(f"Processing failed for {input_path}: "+str(ex))
+            if len(input_paths) == 1:
+                # if only processing one scene, re-raise the exception and fail the execution
+                # if processing multiple scenes, continue
+                raise
 
 if __name__ == '__main__':
     main()

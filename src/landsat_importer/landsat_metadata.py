@@ -1,12 +1,43 @@
 import os
-from .oli_formats import OLIFormats
+from .optical_formats import OpticalFormats
 
 class LandsatMetadata:
 
-    def __init__(self, metadata, path, oli_format):
+    def __init__(self, metadata, path, optical_format):
         self.metadata = metadata
         self.path = path
-        self.oli_format = oli_format
+        self.optical_format = optical_format
+
+    def set_optical_metadata(self):
+        self.optical_units = ""
+        self.optical_standard_name = ""
+        self.optical_comment = ""
+        if self.level == 1:
+            if self.optical_format is OpticalFormats.RADIANCE:
+                self.optical_units = "W m-2 sr-1 um-1"
+                self.optical_standard_name = "toa_outgoing_radiance_per_unit_wavelength"
+                self.optical_comment = None
+            elif self.optical_format is OpticalFormats.CORRECTED_REFLECTANCE:
+                self.optical_units = "1"
+                self.optical_standard_name = "toa_bidirectional_reflectance"
+                self.optical_comment = None
+            elif self.optical_format is OpticalFormats.REFLECTANCE:
+                self.optical_units = "1"
+                self.optical_standard_name = None
+                self.optical_comment = "TOA reflectance without factor for solar zenith angle"
+            else:
+                raise Exception("Unsupported OLI output format %s" % str(self.optical_format))
+        elif self.level == 2:
+            self.optical_units = "1"
+            self.optical_standard_name = "surface_bidirectional_reflectance"
+            self.optical_comment = None
+
+        for band in self.optical_bands:
+            self.units[band] = self.optical_units
+            if self.optical_standard_name:
+                self.standard_names[band] = self.optical_standard_name
+            if self.optical_comment:
+                self.comments[band] = self.optical_comment
 
     def get_id(self):
         return f"LANDSAT_SCENE_ID={self.scene_id} LANDSAT_PRODUCT_ID={self.product_id}"
@@ -44,32 +75,22 @@ class LandsatMetadata:
         for file in files:
             for band in bands:
                 suffix = band_suffixes[band]
-                if file.startswith(stem) and file.endswith(suffix):
-                    if band in band_paths:
-                        self.logger.warning("Found multiple TIF files with same suffix %s for band %s, ignoring %s"% (suffix,band,file))
+                if file == stem + "_" + suffix:
                     band_paths[band] = os.path.join(folder, file)
         return band_paths
 
-    def is_bt(self, band):
-        return band in ["10", "11"]
-
-    def is_radiance(self, band):
-        return band in ["1", "2", "3", "4", "5", "6", "7", "8", "9"] and self.oli_format is OLIFormats.RADIANCE
-
-    def is_reflectance(self, band):
-        return band in ["1", "2", "3", "4", "5", "6", "7", "8", "9"] and self.oli_format is OLIFormats.REFLECTANCE
-
-    def is_corrected_reflectance(self, band):
-        return band in ["1", "2", "3", "4", "5", "6", "7", "8", "9"] and self.oli_format is OLIFormats.CORRECTED_REFLECTANCE
+    def get_band_number(self, band):
+        if band.startswith("B"):
+            try:
+                return str(int(band[1:]))
+            except:
+                return None
 
     def is_integer(self, band):
         return band in ["QA", "QA_PIXEL", "QA_AEROSOL", "QA_RADSAT"]
 
-    def is_angle(self, band):
+    def is_level1_angle(self, band):
         return band in ["SAA", "SZA", "VAA", "VZA"]
-
-    def is_level2(self, band):
-        return band in ["ST", "ST_QA", "EMIS", "EMSD", "TRAD", "URAD", "DRAD", "ATRAN"]
 
     def __getitem__(self, keys):
         """
@@ -111,5 +132,19 @@ class LandsatMetadata:
     def __contains__(self, key):
         if self[key]:
             return True
+
+    def get_extent(self, latlon):
+        # order "UL", "UR", "LL", "LR"
+        latlon = latlon.upper()
+        assert latlon in ['LAT', 'LON']
+        root = "LANDSAT_METADATA_FILE/PROJECTION_ATTRIBUTES"
+        ul = self[root + f"/CORNER_UL_{latlon}_PRODUCT"]
+        ur = self[root + f"/CORNER_UR_{latlon}_PRODUCT"]
+        ll = self[root + f"/CORNER_LL_{latlon}_PRODUCT"]
+        lr = self[root + f"/CORNER_LR_{latlon}_PRODUCT"]
+        if ul is None or ur is None or ll is None or lr is None:
+            raise Exception("get_lat_extent")
+        return [float(ul), float(ur), float(ll), float(lr)]
+
 
 

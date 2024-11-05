@@ -1,18 +1,20 @@
 #!/bin/bash
 
-# copy relevant files to JASMIN
+# copy relevant files to a remove server
 
 rootfolder=`dirname $0`/..
-username=$1
-destfolder=$2
 
-if [ -z ${username} ] || [ -z ${destfolder} ];
+hostname=$1
+username=$2
+destfolder=$3
+
+if [ -z ${hostname} ] || [ -z ${username} ] || [ -z ${destfolder} ];
 then
-  echo provide the username and destination folder on JASMIN as arguments
+  echo provide the hostname, username and destination folder as arguments
 else
-  rsync -avr --delete --exclude "*/__pycache__" $rootfolder/src $username@login2.jasmin.ac.uk:$destfolder/landsat_importer
-  rsync -avr $rootfolder/pyproject.toml $username@login2.jasmin.ac.uk:$destfolder/landsat_importer
-  rsync -avr $rootfolder/setup.cfg $username@login2.jasmin.ac.uk:$destfolder/landsat_importer
+  rsync -avr $rootfolder/src $username@$hostname:$destfolder/landsat_importer
+  rsync -avr $rootfolder/pyproject.toml $username@$hostname:$destfolder/landsat_importer
+  rsync -avr $rootfolder/setup.cfg $username@$hostname:$destfolder/landsat_importer
 fi
 
 
