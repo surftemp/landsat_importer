@@ -153,9 +153,9 @@ class Netcdf4Exporter:
         for (key,value) in self.inject_metadata.items():
             dataset.attrs[key] = value
 
-
-
         for band in bands:
+            if band not in dataset:
+                continue
             if add_latlon:
                 dataset[band].attrs['coordinates'] = 'lon lat'
 
@@ -167,13 +167,12 @@ class Netcdf4Exporter:
             dataset[band].encoding.update(ecomp)
 
         # Rename variables to use common netCDF names
-        nmap = {b:self.landsat_metadata.get_name(b) for b in bands}
+        nmap = {b:self.landsat_metadata.get_name(b) for b in bands if b in dataset}
         dataset = dataset.rename(nmap)
 
         dataset["time"] = xr.DataArray(data=np.array([self.landsat_metadata.get_acquisition_timestamp()],dtype='datetime64[ns]'), dims=('time'),
                                       attrs={"standard_name": "time", "long_name":"reference time of observations"})
         dataset.time.encoding.update(dtype='int32', units='seconds since 1978-01-01')
-
 
         dataset.to_netcdf(to_path)
         self.logger.info("Netcdf4 Export complete to %s" % to_path)
