@@ -38,7 +38,7 @@ def main():
     parser.add_argument("--inject-metadata", nargs="+", help="Inject global metadata from one or more key=value pairs", default=[])
 
     parser.add_argument(
-        "--export_optical_as",
+        "--export-optical-as",
         type=OpticalFormats,
         default=OpticalFormats.CORRECTED_REFLECTANCE,
         choices=list(OpticalFormats),
@@ -64,8 +64,6 @@ def main():
     parser.add_argument("--max-lon", help="Max lon of bounding box to extract", type=float, default=None)
 
     parser.add_argument("--limit", type=int, help="process only this many scenes", default=None)
-    parser.add_argument("--offset", type=int, help="start processing at this offset in the list", default=None)
-    parser.add_argument("--batch", type=int, help="use this batch  size", default=None)
 
     args = parser.parse_args()
 
@@ -89,21 +87,15 @@ def main():
 
     idx = 0
     processed = 0
-    offset = args.offset
     limit = args.limit
-    batch = args.batch
+
 
     for input_path in input_paths:
-        if offset is not None and idx < offset:
-            idx += 1
-            continue
+
         if limit is not None and processed >= limit:
             break
 
         output_path = args.output_path
-        if batch is not None:
-            batch_nr = idx // batch
-            output_path = os.path.join(output_path, str(batch_nr))
 
         logger.info(f"Processing {idx}: {input_path} -> {output_path}")
         idx += 1

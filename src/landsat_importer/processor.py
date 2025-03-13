@@ -103,6 +103,7 @@ class Processor:
         """
         start_time = time.time()
         self.logger.info("landsat_importer version %s" % (VERSION))
+        ignore_errors = not target_bands
         self.target_bands = target_bands if target_bands else self.landsat_metadata.get_bands()
 
         # get lon/lat min/max from scene metadata
@@ -119,13 +120,19 @@ class Processor:
         self.logger.info("Acquired at " + str(self.landsat_metadata.get_acquisition_timestamp()))
 
         layers = {}
+
         for band in self.target_bands:
             gc.collect()
-            self.logger.info(f"Processing band {band}")
 
-            # get the data imported from TIFF format
-            band_data, encoding = self.importer.import_tiff(band, self.band_paths[band],
+            try:
+                # get the data imported from TIFF format
+                band_data, encoding = self.importer.import_tiff(band, self.band_paths[band],
                                              self.landsat_metadata.is_integer(band))
+            except:
+                if ignore_errors:
+                    continue
+
+            self.logger.info(f"Processing band {band}")
 
             # decode pixel values according to the encoding parameters stored in the
             # landsat metadata
@@ -161,6 +168,7 @@ class Processor:
 
             layers[band] = processed_band_data
             layers[band].encoding = encoding
+
 
         # Combine all the bands into a single dataset
         self.dataset = xarray.Dataset(layers)
