@@ -46,6 +46,12 @@ Where:
  | --limit | when processing an input folder, stop after processing this many scenes                                | --limit 5 |
  | --export-optical-as | choose how to import optical data, one of "corrected_reflectance" (default), "reflectance", "radiance" | --export-optical-as "radiance" |
 
+## Usage in conjunction with the `usgs` and `usgs-download` tools
+
+The [USGS tools](https://github.com/surftemp/usgs) can be used to locate and download Landsat Imagery.  
+
+An [example script](test/download_and_import.sh) that demonstrates using usgs to download imagery and then landsat_importer to decode and convert them to netcdf4.
+
 ## Known issues
 
 https://www.usgs.gov/landsat-missions/landsat-collection-2-known-issues
