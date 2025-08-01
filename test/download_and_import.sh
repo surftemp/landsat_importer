@@ -16,7 +16,16 @@ usgs_download --filename scenes.csv --output-folder outputs --file-suffixes B2.T
 
 mamba deactivate
 
-# import the scenes
+# import the scenes using landsat_importer
 mamba activate landsat_importer_env
 
 landsat_importer outputs imported
+
+# optional - make true colour plots from the imported scenes (see https://github.com/surftemp/netcdf_explorer for installation details)
+# add the scene time to the plot
+
+mamba deactivate
+
+mamba activate netcdfexplorer_env
+
+bigplot --input-path imported/* --input-variable B4 B3 B2 --attrs acquisition_time --output-path plots
