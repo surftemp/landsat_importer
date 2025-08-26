@@ -61,7 +61,7 @@ class Netcdf4Exporter:
         self.logger = logging.getLogger("Netcdf4Exporter")
 
 
-    def export(self, input_path, dataset, bands, to_path, history="", add_latlon=True, geo_type='float32'):
+    def export(self, input_path, dataset, bands, to_path, history="", add_latlon=True, geo_type='float32', export_scale_offset={}):
         """
         Export an imported scene
 
@@ -73,6 +73,7 @@ class Netcdf4Exporter:
             history: string to supply the processing history to add to global metadata
             add_latlon: calculate and store per-pixel latitude longitude values
             geo_type: storage type for geolocation (x/y and lat/lon coordinates)
+            export_scale_offset: dictionary mapping from BAND to (scale,offset) - encode this band as (signed) int16
         """
         dataset = dataset.expand_dims('time')
         dataset = dataset.rio.write_coordinate_system()
@@ -162,7 +163,21 @@ class Netcdf4Exporter:
             if self.landsat_metadata.is_integer(band):
                 dataset[band].encoding.update({'dtype': 'int32', "_FillValue": -999})
             else:
-                dataset[band].encoding.update({'dtype':'float32'})
+                if band in export_scale_offset:
+                    # int16 encoding is requested
+                    (scale,offset) = export_scale_offset[band]
+                    # only use int16 encoding if safe to do so
+                    min_encodable_value = ( -32767 * scale ) + offset
+                    max_encodable_value = ( 32767 * scale ) + offset
+                    data_min = dataset[band].min(skipna=True).item()
+                    data_max = dataset[band].max(skipna=True).item()
+                    if data_min < min_encodable_value or data_max > max_encodable_value:
+                        self.logger.warning(f"Band {band} requested int16 encoding using (scale={scale},offset={offset}) would overflow (data range=({data_min},{data_max}), encoded_range=({min_encodable_value},{max_encodable_value}) and is not enabled")
+                        dataset[band].encoding.update({'dtype': 'float32'})
+                    else:
+                        dataset[band].encoding.update({'scale_factor': np.float32(scale), 'add_offset': np.float32(offset), 'dtype': 'int16', '_FillValue':-32768})
+                else:
+                    dataset[band].encoding.update({'dtype':'float32'})
 
             dataset[band].encoding.update(ecomp)
 

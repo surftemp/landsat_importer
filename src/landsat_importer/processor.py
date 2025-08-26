@@ -255,7 +255,7 @@ class Processor:
         return self.landsat_metadata
 
     def export(self, output_path, include_angles=False, history="",
-               min_lat=None, min_lon=None, max_lat=None, max_lon=None, inject_metadata={}):
+               min_lat=None, min_lon=None, max_lat=None, max_lon=None, inject_metadata={}, export_scale_offset={}):
         """
         Export the regridded scene
 
@@ -268,6 +268,7 @@ class Processor:
             max_lat: clip exported data to bounding box
             max_lon: clip exported data to bounding box
             inject_metadata: dictionary to supply global metadata to add to exported file
+            export_scale_offset: dictionary mapping from BAND to (scale,offset) - encode this band as (signed) int16
         """
         self.logger.info("Exporting output grid to file %s" % output_path)
 
@@ -313,4 +314,4 @@ class Processor:
             dataset = self.dataset
 
         exporter.export(input_path=self.input_path, dataset=dataset, bands=self.target_bands,
-                        history=history,to_path=output_path)
+                        history=history,to_path=output_path, export_scale_offset=export_scale_offset)

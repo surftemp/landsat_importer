@@ -65,6 +65,8 @@ def main():
 
     parser.add_argument("--limit", type=int, help="process only this many scenes", default=None)
 
+    parser.add_argument("--export-int16", nargs=3, metavar=("BAND","OFFSET","SCALE"), action="append", help="export band as int16 with offset and scale", default=[])
+
     args = parser.parse_args()
 
     from landsat_importer.processor import Processor
@@ -89,6 +91,12 @@ def main():
     processed = 0
     limit = args.limit
 
+    export_scale_offset = {}
+    for export_scale in args.export_int16:
+        band = export_scale[0]
+        scale = float(export_scale[1])
+        offset = float(export_scale[2])
+        export_scale_offset[band] = (scale,offset)
 
     for input_path in input_paths:
 
@@ -127,7 +135,8 @@ def main():
 
             p.process(target_bands)
             p.export(output_file_path, include_angles=args.include_angles, min_lat=args.min_lat, min_lon=args.min_lon,
-                     max_lat=args.max_lat, max_lon=args.max_lon, inject_metadata=inject_metadata)
+                     max_lat=args.max_lat, max_lon=args.max_lon, inject_metadata=inject_metadata,
+                     export_scale_offset=export_scale_offset)
 
         except Exception as ex:
             logger.exception(f"Processing failed for {input_path}: "+str(ex))
