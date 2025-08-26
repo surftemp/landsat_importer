@@ -175,8 +175,7 @@ class Netcdf4Exporter:
                         self.logger.warning(f"Band {band} requested int16 encoding using (scale={scale},offset={offset}) would overflow (data range=({data_min},{data_max}), encoded_range=({min_encodable_value},{max_encodable_value}) and is not enabled")
                         dataset[band].encoding.update({'dtype': 'float32'})
                     else:
-                        dataset[band].encoding.update({'scale_factor': scale, 'add_offset': offset, 'dtype': 'int16', '_FillValue':-32768})
-
+                        dataset[band].encoding.update({'scale_factor': np.float32(scale), 'add_offset': np.float32(offset), 'dtype': 'int16', '_FillValue':-32768})
                 else:
                     dataset[band].encoding.update({'dtype':'float32'})
 

@@ -37,15 +37,15 @@ Where:
 
 ## Command line options
 
-| option                                     | description                                                                                                                             | example                                                                                                 |
-|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| --bands                                    | provide a list of bands to import                                                                                                       | --bands B2 B3 B4                                                                                        |
- | --include-angles                           | include angle data                                                                                                                      | --include-angles                                                                                        |
- | --output-file-pattern                      | specify a pattern for naming the output file                                                                                            | default is --output-file-pattern {Y}{m}{d}{H}{M}{S}-NCEO-{level}-{product}-v{collection:0.1f}-fv01.0.nc |
- | --min-lat, --max-lat, --min-lon, --max-lon | define a bounding box for importing the scene                                                                                           | --min-lat 50 --max-lat 50.5 --min-lon -0.5 --max-lon 0                                                  |
- | --limit                                    | when processing an input folder, stop after processing this many scenes                                                                 | --limit 5                                                                                               |
- | --export-optical-as                        | choose how to import optical data, one of "corrected_reflectance" (default), "reflectance", "radiance"                                  | --export-optical-as "radiance"                                                                          |
- | --export-int16                             | store a band using int16 values, using the provided the band name, scale factor and offset.  This option needs to be used for each band | --export-int16 B4 0.001 0                                                                               |
+| option                                                                 | description                                                                                                                                                                    |
+|------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| --bands BANDS                                                          | List of bands to process <br> example: **--bands B2 B3 B4**                                                                                                                    |
+| --include-angles                                                       | include angle data                                                                                                                                                             |
+| --output-file-pattern PATTERN                                          | specify a pattern for naming the output file.  <br>The default is equivalent to --output-file-pattern "{Y}{m}{d}{H}{M}{S}-NCEO-{level}-{product}-v{collection:0.1f}-fv01.0.nc" |
+| --min-lat LAT <br> --max-lat LAT <br> --min-lon LON <br> --max-lon LON | define a bounding box in decimal degrees for importing the scene <br>example: **--min-lat 50 --max-lat 50.5 --min-lon -0.5 --max-lon 0**                                       |
+| --limit N                                                              | Only process the first N scenes found                                                                                                                                          |
+| --export-optical-as FORMAT                                             | choose how to import optical data as "corrected_reflectance",  "reflectance" or "radiance".  <br>example: **--export-optical-as radiance**                                     |                                                          
+| --export-int16 BAND SCALE OFFSET                                       | store a band using int16 values, using the provided the band name, scale factor and offset. <br>example: **--export-int16 B4 0.001 0**                                         |
 
 The `--export-int16` option can be very useful in compressing the output data.  However, the tool will check that the values within the band lie within the range that can be safely compressed and if not, will disable compression, displaying the following message
 
@@ -74,10 +74,10 @@ https://www.usgs.gov/landsat-missions/landsat-collection-2-known-issues
 
 | version | changes                                                                                |
 |---------|----------------------------------------------------------------------------------------|
- | 0.0.1   | initial version                                                                        |
- | 0.0.2   | add support for Landsat 7                                                              |
- | 0.0.3   | rename `--export_optical_as` to `--export-optical-as`, remove `--offset` and `--batch` |
- | 0.0.4   | add `--export-int16`                                                                   |
+| 0.0.1   | initial version                                                                        |
+| 0.0.2   | add support for Landsat 7                                                              |
+| 0.0.3   | rename `--export_optical_as` to `--export-optical-as`, remove `--offset` and `--batch` |
+| 0.0.4   | add `--export-int16`                                                                   |
 
 
 
