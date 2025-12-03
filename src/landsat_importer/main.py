@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 #     landsat_importer
-#     Copyright (C) 2023  National Centre for Earth Observation (NCEO)
+#     Copyright (C) 2023-2025  National Centre for Earth Observation (NCEO)
 #
 #     This program is free software: you can redistribute it and/or modify
 #     it under the terms of the GNU General Public License as published by
@@ -17,7 +17,9 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import logging
-import json
+import sys
+
+import landsat_importer
 
 def main():
 
@@ -28,7 +30,8 @@ def main():
     import os.path
     from .optical_formats import OpticalFormats
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(prog='landsat_importer', usage='%(prog)s [options]')
+    parser.add_argument('-V', '--version', action='version', version="%(prog)s " + landsat_importer.VERSION)
 
     parser.add_argument("input_path",help="Specify the path to the input landsat scene, may be a folder or metadata filename")
     parser.add_argument("output_path", help="Specify the output folder or filename")
@@ -36,6 +39,9 @@ def main():
     parser.add_argument("--bands", nargs="+", help="Provide a list of the bands to import")
 
     parser.add_argument("--inject-metadata", nargs="+", help="Inject global metadata from one or more key=value pairs", default=[])
+
+    parser.add_argument("--check-version", help="Check the version and fail if there is a mismatch")
+
 
     parser.add_argument(
         "--export-optical-as",
@@ -65,9 +71,14 @@ def main():
 
     parser.add_argument("--limit", type=int, help="process only this many scenes", default=None)
 
-    parser.add_argument("--export-int16", nargs=3, metavar=("BAND","OFFSET","SCALE"), action="append", help="export band as int16 with offset and scale", default=[])
+    parser.add_argument("--export-int16", nargs=3, metavar=("BAND","SCALE","OFFSET"), action="append", help="export band as int16 with offset and scale", default=[])
 
     args = parser.parse_args()
+
+    if args.check_version:
+        if landsat_importer.VERSION != args.check_version:
+            print(f"Version mismatch - actual version: {landsat_importer.VERSION} != expected version: {args.check_version}")
+            sys.exit(-1)
 
     from landsat_importer.processor import Processor
     input_paths = []
