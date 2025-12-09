@@ -47,7 +47,8 @@ class Processor:
     M_PER_DEGREE_LATLON = 111111
 
     def __init__(self, input_path,
-                 optical_format=OpticalFormats.CORRECTED_REFLECTANCE):
+                 optical_format=OpticalFormats.CORRECTED_REFLECTANCE,
+                 extra_bands=[]):
         """
         Construct a Processor
 
@@ -69,8 +70,16 @@ class Processor:
 
         # find the paths associated with the various bands that could exist in this scene
         # note that the input folder may not contain all the expected files
-        self.band_paths = self.landsat_metadata.scan(bands=self.landsat_metadata.get_bands(),
-                                                band_suffixes=self.landsat_metadata.get_band_suffixes())
+
+        band_suffixes = {}
+        for band, suffix in self.landsat_metadata.get_band_suffixes().items():
+            band_suffixes[band] = suffix
+        for band in extra_bands:
+            band_suffixes[band] = band+".TIF"
+
+        self.band_paths = self.landsat_metadata.scan(
+            bands=self.landsat_metadata.get_bands()+extra_bands,
+            band_suffixes=band_suffixes)
 
         self.logger.info("Read metadata: "+str(self.landsat_metadata))
 

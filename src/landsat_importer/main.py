@@ -37,6 +37,7 @@ def main():
     parser.add_argument("output_path", help="Specify the output folder or filename")
 
     parser.add_argument("--bands", nargs="+", help="Provide a list of the bands to import")
+    parser.add_argument("--extra-bands", nargs="+", help="specify extra bands to import", default=[])
 
     parser.add_argument("--inject-metadata", nargs="+", help="Inject global metadata from one or more key=value pairs", default=[])
 
@@ -122,11 +123,15 @@ def main():
 
         try:
             p = Processor(input_path,
-                          optical_format=args.export_optical_as)
+                          optical_format=args.export_optical_as, extra_bands=args.extra_bands)
             target_bands = []
             # collect the target bands.  For bands specified as numbers, add a B prefix
             if args.bands:
                 target_bands = args.bands[:]
+
+            # include any extra bands, to be imported verbatim
+            for band in args.extra_bands:
+                target_bands.append(band)
 
             if len(input_paths)>1 or not output_path.endswith(".nc"):
                 # looks like output_path should specify a directory so
